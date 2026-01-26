@@ -58,6 +58,7 @@ import {
 import { AddSlideDialog } from '@/components/AddSlideDialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { OcrOverlay } from '@/components/OcrOverlay'
+import { SlideToolbar } from '@/components/SlideToolbar'
 import { useProjectStore } from '@/stores/projectStore'
 import { editImage, isGeminiInitialized, initializeGemini } from '@/lib/gemini'
 import { extractText } from '@/lib/ocr'
@@ -573,7 +574,22 @@ export function EditorPage() {
         {/* Center - Main Editor */}
         <main className="flex flex-1 flex-col overflow-hidden">
           {/* Slide Preview */}
-          <div ref={imageContainerRef} className="flex-1 overflow-hidden bg-gray-100 p-6" style={{ minHeight: 0 }}>
+          <div ref={imageContainerRef} className="relative flex-1 overflow-hidden bg-gray-100 p-4" style={{ minHeight: 0 }}>
+            {/* Floating Slide Toolbar */}
+            {selectedSlide && (
+              <SlideToolbar
+                slideId={selectedSlide.id}
+                hasOcrCache={!!selectedSlide.ocrCache}
+                isOcrVisible={showOcrOverlay}
+                onExecuteOcr={handleOcrExecute}
+                onToggleVisibility={() => setShowOcrOverlay(!showOcrOverlay)}
+                onClearOcr={() => clearSlideOcrResult(selectedSlide.id)}
+                isProcessing={isOcrProcessing}
+                processingStatus={ocrStatus}
+                containerRef={imageContainerRef}
+              />
+            )}
+
             <div className="h-full w-full flex items-center justify-center">
               <ContextMenu>
                 <ContextMenuTrigger asChild>
@@ -618,43 +634,7 @@ export function EditorPage() {
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent>
-                  {selectedSlide.ocrCache ? (
-                    <>
-                      <ContextMenuItem onClick={() => setShowOcrOverlay(!showOcrOverlay)}>
-                        {showOcrOverlay ? (
-                          <>
-                            <EyeOff className="mr-2 h-4 w-4" />
-                            OCRを非表示
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="mr-2 h-4 w-4" />
-                            OCRを表示
-                          </>
-                        )}
-                      </ContextMenuItem>
-                      <ContextMenuItem
-                        onClick={handleOcrExecute}
-                        disabled={isEditing || isOcrProcessing}
-                      >
-                        <ScanText className="mr-2 h-4 w-4" />
-                        OCRを再実行
-                      </ContextMenuItem>
-                      <ContextMenuSeparator />
-                      <ContextMenuItem onClick={() => clearSlideOcrResult(selectedSlide.id)}>
-                        <X className="mr-2 h-4 w-4" />
-                        OCR結果を削除
-                      </ContextMenuItem>
-                    </>
-                  ) : (
-                    <ContextMenuItem
-                      onClick={handleOcrExecute}
-                      disabled={isEditing || isOcrProcessing}
-                    >
-                      <ScanText className="mr-2 h-4 w-4" />
-                      OCRを実行
-                    </ContextMenuItem>
-                  )}
+                  {/* Context menu content can be added here for other features if needed */}
                 </ContextMenuContent>
               </ContextMenu>
             </div>
