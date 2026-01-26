@@ -82,7 +82,7 @@ export function HomePage() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-        <h1 className="text-2xl font-bold text-gray-900">EditNoteLM</h1>
+        <h1 className="text-2xl font-bold text-gray-900">SlideFlow</h1>
         <Button variant="ghost" size="icon" onClick={handleOpenSettings}>
           <Settings className="h-5 w-5" />
         </Button>
