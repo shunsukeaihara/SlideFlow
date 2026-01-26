@@ -436,6 +436,60 @@ export function EditorPage() {
     [selectedSlideId, revertToHistory]
   )
 
+  const handleOcrExecute = useCallback(async () => {
+    if (!selectedSlide || isOcrProcessing) return
+
+    setIsOcrProcessing(true)
+    setOcrStatus('OCR処理を開始中...')
+
+    try {
+      const ocrResult = await extractText(
+        selectedSlide.image.currentDataUrl,
+        appSettings.apiKey,
+        {
+          onProgress: (status) => setOcrStatus(status)
+        }
+      )
+      setSlideOcrResult(selectedSlide.id, ocrResult)
+      setShowOcrOverlay(true)
+    } catch (err) {
+      console.error('OCR error:', err)
+      alert('OCR処理に失敗しました: ' + (err instanceof Error ? err.message : ''))
+    } finally {
+      setIsOcrProcessing(false)
+      setOcrStatus('')
+    }
+  }, [selectedSlide, isOcrProcessing, appSettings.apiKey, setSlideOcrResult])
+
+  // Update container size on mount and resize
+  useEffect(() => {
+    const updateContainerSize = () => {
+      if (imageContainerRef.current) {
+        const rect = imageContainerRef.current.getBoundingClientRect()
+        setContainerSize({ width: rect.width, height: rect.height })
+      }
+    }
+
+    updateContainerSize()
+
+    window.addEventListener('resize', updateContainerSize)
+    return () => window.removeEventListener('resize', updateContainerSize)
+  }, [])
+
+  // Update container size when selected slide changes
+  useEffect(() => {
+    const updateContainerSize = () => {
+      if (imageContainerRef.current) {
+        const rect = imageContainerRef.current.getBoundingClientRect()
+        setContainerSize({ width: rect.width, height: rect.height })
+      }
+    }
+
+    // Delay to ensure layout is complete
+    const timer = setTimeout(updateContainerSize, 100)
+    return () => clearTimeout(timer)
+  }, [selectedSlideId])
+
   if (!project || !selectedSlide) {
     return null
   }
@@ -510,23 +564,86 @@ export function EditorPage() {
         {/* Center - Main Editor */}
         <main className="flex flex-1 flex-col overflow-hidden">
           {/* Slide Preview */}
-          <div className="flex-1 overflow-auto bg-gray-100 p-6">
-            <div className="mx-auto flex h-full items-center justify-center">
-              <div className="relative">
-                <img
-                  ref={imageRef}
-                  src={selectedSlide.image.currentDataUrl}
-                  alt={`Slide ${selectedSlide.pageNumber}`}
-                  className="max-h-full max-w-full rounded-lg shadow-lg"
-                />
-                {selectedSlide.ocrCache && imageRef.current && (
-                  <OcrOverlay
-                    ocrResult={selectedSlide.ocrCache}
-                    imageElement={imageRef.current}
-                    onClose={() => clearSlideOcrResult(selectedSlide.id)}
-                  />
-                )}
-              </div>
+          <div ref={imageContainerRef} className="flex-1 overflow-hidden bg-gray-100 p-6">
+            <div className="h-full w-full flex items-center justify-center">
+              <ContextMenu>
+                <ContextMenuTrigger asChild>
+                  <div className="relative" style={{
+                    maxHeight: containerSize.height > 0 ? `${containerSize.height}px` : '100%',
+                    maxWidth: containerSize.width > 0 ? `${containerSize.width}px` : '100%'
+                  }}>
+                    <img
+                      ref={imageRef}
+                      src={selectedSlide.image.currentDataUrl}
+                      alt={`Slide ${selectedSlide.pageNumber}`}
+                      className="rounded-lg shadow-lg"
+                      style={{
+                        display: 'block',
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        width: 'auto',
+                        height: 'auto',
+                        objectFit: 'contain'
+                      }}
+                    />
+                    {selectedSlide.ocrCache && imageRef.current && showOcrOverlay && (
+                      <OcrOverlay
+                        ocrResult={selectedSlide.ocrCache}
+                        imageElement={imageRef.current}
+                      />
+                    )}
+                    {isOcrProcessing && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
+                        <div className="bg-white rounded-lg p-6 shadow-xl max-w-sm w-full mx-4">
+                          <div className="flex items-center gap-3">
+                            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                            <span className="text-lg font-medium">{ocrStatus}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  {selectedSlide.ocrCache ? (
+                    <>
+                      <ContextMenuItem onClick={() => setShowOcrOverlay(!showOcrOverlay)}>
+                        {showOcrOverlay ? (
+                          <>
+                            <EyeOff className="mr-2 h-4 w-4" />
+                            OCRを非表示
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="mr-2 h-4 w-4" />
+                            OCRを表示
+                          </>
+                        )}
+                      </ContextMenuItem>
+                      <ContextMenuItem
+                        onClick={handleOcrExecute}
+                        disabled={isEditing || isOcrProcessing}
+                      >
+                        <ScanText className="mr-2 h-4 w-4" />
+                        OCRを再実行
+                      </ContextMenuItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem onClick={() => clearSlideOcrResult(selectedSlide.id)}>
+                        <X className="mr-2 h-4 w-4" />
+                        OCR結果を削除
+                      </ContextMenuItem>
+                    </>
+                  ) : (
+                    <ContextMenuItem
+                      onClick={handleOcrExecute}
+                      disabled={isEditing || isOcrProcessing}
+                    >
+                      <ScanText className="mr-2 h-4 w-4" />
+                      OCRを実行
+                    </ContextMenuItem>
+                  )}
+                </ContextMenuContent>
+              </ContextMenu>
             </div>
           </div>
 
