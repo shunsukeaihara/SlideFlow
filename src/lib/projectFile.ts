@@ -91,9 +91,7 @@ async function loadProjectFromZipData(zip: JSZip): Promise<Project> {
     for (const [id, image] of Object.entries(project.images)) {
       images[id] = {
         ...image,
-        dataUrl: image.imagePath
-          ? await loadImageFromZip(zip, image.imagePath)
-          : image.dataUrl
+        dataUrl: image.imagePath ? await loadImageFromZip(zip, image.imagePath) : image.dataUrl
       }
     }
 

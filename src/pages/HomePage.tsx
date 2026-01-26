@@ -141,7 +141,7 @@ export function HomePage() {
       <input
         ref={projectInputRef}
         type="file"
-        accept=".enlm"
+        accept=".sfpj"
         className="hidden"
         onChange={handleProjectFileChange}
       />

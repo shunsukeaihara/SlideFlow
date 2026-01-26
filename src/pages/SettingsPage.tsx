@@ -94,7 +94,8 @@ export function SettingsPage() {
                   </Button>
                 </div>
                 <p className="text-xs text-gray-500">
-                  APIキーはブラウザのlocalStorageに保存され、Gemini APIへのリクエストにのみ使用されます。
+                  APIキーはブラウザのlocalStorageに保存され、Gemini
+                  APIへのリクエストにのみ使用されます。
                 </p>
               </div>
             </CardContent>

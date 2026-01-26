@@ -47,7 +47,10 @@ export async function extractTextWithTesseract(dataUrl: string): Promise<OcrText
 
           // Collect all text from lines in this paragraph
           const paragraphTexts: string[] = []
-          const lines: Array<{ text: string; bbox: { x: number; y: number; width: number; height: number } }> = []
+          const lines: Array<{
+            text: string
+            bbox: { x: number; y: number; width: number; height: number }
+          }> = []
           let minX = Infinity
           let minY = Infinity
           let maxX = -Infinity
@@ -144,7 +147,9 @@ export async function extractTextWithTesseract(dataUrl: string): Promise<OcrText
     return textBlocks
   } catch (error) {
     console.error('Tesseract OCR error:', error)
-    throw new Error(`Tesseract OCR failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    throw new Error(
+      `Tesseract OCR failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    )
   } finally {
     // Always terminate the worker to free memory
     if (worker) {

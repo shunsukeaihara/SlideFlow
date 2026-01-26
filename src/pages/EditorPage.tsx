@@ -469,7 +469,7 @@ export function EditorPage() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = getProjectFileName(project.name) // {プロジェクト名}.enlm
+      a.download = getProjectFileName(project.name) // {プロジェクト名}.sfpj
       a.click()
       URL.revokeObjectURL(url)
 

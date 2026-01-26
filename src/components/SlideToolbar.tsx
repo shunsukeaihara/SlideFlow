@@ -130,11 +130,7 @@ export function SlideToolbar({
             onClick={() => setIsMinimized(!isMinimized)}
             className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
           >
-            {isMinimized ? (
-              <Maximize2 className="h-3 w-3" />
-            ) : (
-              <Minimize2 className="h-3 w-3" />
-            )}
+            {isMinimized ? <Maximize2 className="h-3 w-3" /> : <Minimize2 className="h-3 w-3" />}
           </button>
         </div>
 

@@ -45,7 +45,7 @@ async function extractImagesFromPdfData(data: ArrayBuffer): Promise<ExtractedIma
       canvas
     }).promise
 
-    const dataUrl = canvas.toDataURL('image/webp', 0.90)
+    const dataUrl = canvas.toDataURL('image/webp', 0.9)
 
     slides.push({
       imageDataUrl: dataUrl,

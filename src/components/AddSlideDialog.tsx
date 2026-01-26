@@ -102,7 +102,6 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
     }
   }, [])
 
-
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) {
       alert('プロンプトを入力してください。')
@@ -508,7 +507,11 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
                 onClick={() => setShowReferencePanel(!showReferencePanel)}
                 className="gap-1 text-gray-600"
               >
-                {showReferencePanel ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                {showReferencePanel ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronUp className="h-4 w-4" />
+                )}
                 参照画像
               </Button>
 
@@ -588,7 +591,11 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
                           key={id}
                           className="relative flex-shrink-0 w-12 h-8 rounded border-2 border-blue-500 overflow-hidden"
                         >
-                          <img src={ref.dataUrl} alt={ref.name} className="w-full h-full object-cover" />
+                          <img
+                            src={ref.dataUrl}
+                            alt={ref.name}
+                            className="w-full h-full object-cover"
+                          />
                           <button
                             className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl hover:bg-red-600"
                             onClick={() => {
