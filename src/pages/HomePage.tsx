@@ -33,13 +33,7 @@ export function HomePage() {
         setLoading(true)
         const slides = await extractImagesFromPdf(file)
         const projectName = file.name.replace(/\.pdf$/i, '')
-        const project = createProject(
-          projectName,
-          slides.map((image) => ({
-            pageNumber: image.pageNumber,
-            image
-          }))
-        )
+        const project = createProject(projectName, slides)
         setProject(project)
 
         navigate('/editor')

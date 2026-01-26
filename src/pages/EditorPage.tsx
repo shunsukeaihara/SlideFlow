@@ -53,9 +53,11 @@ import {
   ContextMenuTrigger
 } from '@/components/ui/context-menu'
 import { AddSlideDialog } from '@/components/AddSlideDialog'
-import { Checkbox } from '@/components/ui/checkbox'
+import { OcrOverlay } from '@/components/OcrOverlay'
+import { SlideToolbar } from '@/components/SlideToolbar'
 import { useProjectStore } from '@/stores/projectStore'
 import { editImage, isGeminiInitialized, initializeGemini } from '@/lib/gemini'
+import { extractText } from '@/lib/ocr'
 import { createPdfFromImages } from '@/lib/pdf'
 import { saveProjectToZip, getProjectFileName } from '@/lib/projectFile'
 import { cn } from '@/lib/utils'
@@ -67,10 +69,13 @@ interface ReferenceImage {
   name: string
   isSlide: boolean
   slideId?: string
+  width?: number
+  height?: number
 }
 
 interface SortableSlideItemProps {
   slide: Slide
+  imageDataUrl: string
   isSelected: boolean
   onSelect: () => void
   onAddBefore: () => void
@@ -81,6 +86,7 @@ interface SortableSlideItemProps {
 
 function SortableSlideItem({
   slide,
+  imageDataUrl,
   isSelected,
   onSelect,
   onAddBefore,
@@ -107,21 +113,12 @@ function SortableSlideItem({
           style={style}
           className={cn(
             'relative w-full overflow-hidden rounded-lg border-2 transition-all group',
-            isSelected
-              ? 'border-blue-500 shadow-md'
-              : 'border-transparent hover:border-gray-300',
+            isSelected ? 'border-blue-500 shadow-md' : 'border-transparent hover:border-gray-300',
             isDragging && 'shadow-xl'
           )}
         >
-          <button
-            onClick={onSelect}
-            className="w-full"
-          >
-            <img
-              src={slide.image.currentDataUrl}
-              alt={`Slide ${slide.pageNumber}`}
-              className="w-full"
-            />
+          <button onClick={onSelect} className="w-full">
+            <img src={imageDataUrl} alt={`Slide ${slide.pageNumber}`} className="w-full" />
             <div className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-xs text-white">
               {slide.pageNumber}
             </div>
@@ -174,9 +171,15 @@ export function EditorPage() {
   const [addSlideDialogOpen, setAddSlideDialogOpen] = useState(false)
   const [addSlideInsertIndex, setAddSlideInsertIndex] = useState(0)
   const [showReferencePanel, setShowReferencePanel] = useState(false)
+  const [referenceTab, setReferenceTab] = useState<'current' | 'uploaded' | 'history'>('current')
   const [selectedReferenceIds, setSelectedReferenceIds] = useState<Set<string>>(new Set())
   const [uploadedImages, setUploadedImages] = useState<ReferenceImage[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageRef = useRef<HTMLImageElement>(null)
+  const imageContainerRef = useRef<HTMLDivElement>(null)
+  const [showOcrOverlay, setShowOcrOverlay] = useState(true)
+  const [isOcrProcessing, setIsOcrProcessing] = useState(false)
+  const [ocrStatus, setOcrStatus] = useState('')
 
   const {
     project,
@@ -186,7 +189,9 @@ export function EditorPage() {
     addEditHistory,
     revertToHistory,
     reorderSlides,
-    deleteSlide
+    deleteSlide,
+    clearSlideOcrResult,
+    setSlideOcrResult
   } = useProjectStore()
 
   const sensors = useSensors(
@@ -214,17 +219,41 @@ export function EditorPage() {
 
   const selectedSlide = project?.slides.find((s) => s.id === selectedSlideId)
 
+  // Helper functions to get image data from the image pool
+  const getCurrentImageData = useCallback(
+    (slide: Slide | undefined) => {
+      if (!slide || !project?.images) return undefined
+      return project.images[slide.image.currentImageId]
+    },
+    [project?.images]
+  )
+
+  const getOriginalImageData = useCallback(
+    (slide: Slide | undefined) => {
+      if (!slide || !project?.images) return undefined
+      return project.images[slide.image.originalImageId]
+    },
+    [project?.images]
+  )
+
+  const selectedSlideImageData = getCurrentImageData(selectedSlide)
+
   // 参照画像リストを構築（選択中のスライドを除く）
   const allReferences: ReferenceImage[] = [
     ...(project?.slides
       .filter((slide) => slide.id !== selectedSlideId)
-      .map((slide) => ({
-        id: `slide-${slide.id}`,
-        dataUrl: slide.image.currentDataUrl,
-        name: `スライド ${slide.pageNumber}`,
-        isSlide: true,
-        slideId: slide.id
-      })) || []),
+      .map((slide) => {
+        const imageData = getCurrentImageData(slide)
+        return {
+          id: `slide-${slide.id}`,
+          dataUrl: imageData?.dataUrl || '',
+          name: `スライド ${slide.pageNumber}`,
+          isSlide: true,
+          slideId: slide.id,
+          width: imageData?.width,
+          height: imageData?.height
+        }
+      }) || []),
     ...uploadedImages
   ]
 
@@ -254,17 +283,25 @@ export function EditorPage() {
       const reader = new FileReader()
       reader.onload = (ev) => {
         const dataUrl = ev.target?.result as string
-        const id = `upload-${Date.now()}-${Math.random()}`
-        setUploadedImages((prev) => [
-          ...prev,
-          {
-            id,
-            dataUrl,
-            name: file.name,
-            isSlide: false
-          }
-        ])
-        setSelectedReferenceIds((prev) => new Set([...prev, id]))
+
+        // Get image dimensions
+        const img = new window.Image()
+        img.onload = () => {
+          const id = `upload-${Date.now()}-${Math.random()}`
+          setUploadedImages((prev) => [
+            ...prev,
+            {
+              id,
+              dataUrl,
+              name: file.name,
+              isSlide: false,
+              width: img.width,
+              height: img.height
+            }
+          ])
+          setSelectedReferenceIds((prev) => new Set([...prev, id]))
+        }
+        img.src = dataUrl
       }
       reader.readAsDataURL(file)
     })
@@ -337,25 +374,66 @@ export function EditorPage() {
         fullPrompt = `${prompt}\n\n【参照画像】\n${refDescription}\n\n上記の参照画像のスタイルや内容を参考にして編集してください。`
       }
 
+      const currentImageData = getCurrentImageData(selectedSlide)
+      if (!currentImageData) {
+        throw new Error('Current image data not found')
+      }
+
       const resultImageDataUrl = await editImage(
-        selectedSlide.image.currentDataUrl,
+        currentImageData.dataUrl,
         fullPrompt,
         project?.settings.systemPrompt
       )
 
-      // 使用した参照画像を履歴に保存（アップロード画像のみ）
-      const usedReferenceImages = selectedReferences
-        .filter((ref) => !ref.isSlide)
-        .map((ref) => ({
-          name: ref.name,
-          dataUrl: ref.dataUrl
-        }))
+      // 使用した参照画像を履歴に保存
+      // - 既存画像（image-*, history-*, slide-*）はIDのみを記録
+      // - 新規アップロード画像（upload-*）は新規としてimages辞書に追加
+
+      const existingImageIds: string[] = []
+      const newReferenceImages: Array<{
+        name: string
+        dataUrl: string
+        width: number
+        height: number
+      }> = []
+
+      selectedReferences.forEach((ref) => {
+        if (ref.id.startsWith('image-')) {
+          // Already in project.images, just reference by ID
+          existingImageIds.push(ref.id.replace('image-', ''))
+        } else if (ref.id.startsWith('history-')) {
+          // History image - find the result image ID
+          const entryId = ref.id.replace('history-', '')
+          for (const slide of project?.slides || []) {
+            const entry = slide.editHistory.find((e) => e.id === entryId)
+            if (entry) {
+              existingImageIds.push(entry.resultImageId)
+              break
+            }
+          }
+        } else if (ref.id.startsWith('slide-')) {
+          // Current slide image
+          const slideId = ref.id.replace('slide-', '')
+          const slide = project?.slides.find((s) => s.id === slideId)
+          if (slide) {
+            existingImageIds.push(slide.image.currentImageId)
+          }
+        } else if (ref.id.startsWith('upload-') && ref.width && ref.height) {
+          // New uploaded image - add to images dictionary
+          newReferenceImages.push({
+            name: ref.name,
+            dataUrl: ref.dataUrl,
+            width: ref.width,
+            height: ref.height
+          })
+        }
+      })
 
       addEditHistory(selectedSlide.id, {
-        sourceImageDataUrl: selectedSlide.image.currentDataUrl,
         prompt,
         resultImageDataUrl,
-        referenceImages: usedReferenceImages.length > 0 ? usedReferenceImages : undefined
+        referenceImages: newReferenceImages.length > 0 ? newReferenceImages : undefined,
+        existingReferenceImageIds: existingImageIds.length > 0 ? existingImageIds : undefined
       })
 
       setPrompt('')
@@ -368,7 +446,15 @@ export function EditorPage() {
     } finally {
       setIsEditing(false)
     }
-  }, [selectedSlide, prompt, project?.settings.systemPrompt, addEditHistory, navigate, allReferences, selectedReferenceIds])
+  }, [
+    selectedSlide,
+    prompt,
+    project?.settings.systemPrompt,
+    addEditHistory,
+    navigate,
+    allReferences,
+    selectedReferenceIds
+  ])
 
   // プロジェクトファイルをダウンロード保存
   const handleSaveProject = useCallback(async () => {
@@ -400,7 +486,10 @@ export function EditorPage() {
     if (!project) return
 
     try {
-      const images = project.slides.map((s) => s.image.currentDataUrl)
+      const images = project.slides.map((s) => {
+        const imageData = project.images[s.image.currentImageId]
+        return imageData?.dataUrl || ''
+      })
       const blob = await createPdfFromImages(images)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -421,6 +510,33 @@ export function EditorPage() {
     },
     [selectedSlideId, revertToHistory]
   )
+
+  const handleOcrExecute = useCallback(async () => {
+    if (!selectedSlide || isOcrProcessing) return
+
+    const currentImageData = getCurrentImageData(selectedSlide)
+    if (!currentImageData) {
+      alert('画像データが見つかりません')
+      return
+    }
+
+    setIsOcrProcessing(true)
+    setOcrStatus('OCR処理を開始中...')
+
+    try {
+      const ocrResult = await extractText(currentImageData.dataUrl, appSettings.apiKey, {
+        onProgress: (status) => setOcrStatus(status)
+      })
+      setSlideOcrResult(selectedSlide.id, ocrResult)
+      setShowOcrOverlay(true)
+    } catch (err) {
+      console.error('OCR error:', err)
+      alert('OCR処理に失敗しました: ' + (err instanceof Error ? err.message : ''))
+    } finally {
+      setIsOcrProcessing(false)
+      setOcrStatus('')
+    }
+  }, [selectedSlide, isOcrProcessing, appSettings.apiKey, setSlideOcrResult])
 
   if (!project || !selectedSlide) {
     return null
@@ -475,18 +591,22 @@ export function EditorPage() {
                   items={project.slides.map((s) => s.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  {project.slides.map((slide, index) => (
-                    <SortableSlideItem
-                      key={slide.id}
-                      slide={slide}
-                      isSelected={slide.id === selectedSlideId}
-                      onSelect={() => setSelectedSlide(slide.id)}
-                      onAddBefore={() => handleAddSlideBefore(index)}
-                      onAddAfter={() => handleAddSlideAfter(index)}
-                      onDelete={() => handleDeleteSlide(slide.id)}
-                      canDelete={project.slides.length > 1}
-                    />
-                  ))}
+                  {project.slides.map((slide, index) => {
+                    const imageData = project.images[slide.image.currentImageId]
+                    return (
+                      <SortableSlideItem
+                        key={slide.id}
+                        slide={slide}
+                        imageDataUrl={imageData?.dataUrl || ''}
+                        isSelected={slide.id === selectedSlideId}
+                        onSelect={() => setSelectedSlide(slide.id)}
+                        onAddBefore={() => handleAddSlideBefore(index)}
+                        onAddAfter={() => handleAddSlideAfter(index)}
+                        onDelete={() => handleDeleteSlide(slide.id)}
+                        canDelete={project.slides.length > 1}
+                      />
+                    )
+                  })}
                 </SortableContext>
               </DndContext>
             </div>
@@ -496,13 +616,79 @@ export function EditorPage() {
         {/* Center - Main Editor */}
         <main className="flex flex-1 flex-col overflow-hidden">
           {/* Slide Preview */}
-          <div className="flex-1 overflow-auto bg-gray-100 p-6">
-            <div className="mx-auto flex h-full items-center justify-center">
-              <img
-                src={selectedSlide.image.currentDataUrl}
-                alt={`Slide ${selectedSlide.pageNumber}`}
-                className="max-h-full max-w-full rounded-lg shadow-lg"
+          <div
+            ref={imageContainerRef}
+            className="relative flex-1 overflow-hidden bg-gray-100 p-4"
+            style={{ minHeight: 0 }}
+          >
+            {/* Floating Slide Toolbar */}
+            {selectedSlide && selectedSlideImageData && (
+              <SlideToolbar
+                slideId={selectedSlide.id}
+                hasOcrCache={!!selectedSlideImageData.ocrCache}
+                isOcrVisible={showOcrOverlay}
+                onExecuteOcr={handleOcrExecute}
+                onToggleVisibility={() => setShowOcrOverlay(!showOcrOverlay)}
+                onClearOcr={() => clearSlideOcrResult(selectedSlide.id)}
+                isProcessing={isOcrProcessing}
+                containerRef={imageContainerRef}
               />
+            )}
+
+            <div className="h-full w-full flex items-center justify-center">
+              <ContextMenu>
+                <ContextMenuTrigger asChild>
+                  <div
+                    className="relative"
+                    style={{
+                      maxHeight: '100%',
+                      maxWidth: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {selectedSlideImageData && (
+                      <>
+                        <img
+                          ref={imageRef}
+                          src={selectedSlideImageData.dataUrl}
+                          alt={`Slide ${selectedSlide.pageNumber}`}
+                          className="rounded-lg shadow-lg"
+                          style={{
+                            display: 'block',
+                            maxWidth: '100%',
+                            maxHeight: '100%',
+                            width: 'auto',
+                            height: 'auto',
+                            objectFit: 'contain'
+                          }}
+                        />
+                        {selectedSlideImageData.ocrCache && imageRef.current && showOcrOverlay && (
+                          <OcrOverlay
+                            ocrResult={selectedSlideImageData.ocrCache}
+                            imageElement={imageRef.current}
+                          />
+                        )}
+                      </>
+                    )}
+                    {isOcrProcessing && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
+                        <div className="bg-white rounded-lg p-6 shadow-xl max-w-sm w-full mx-4">
+                          <div className="flex items-center gap-3">
+                            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                            <span className="text-lg font-medium">{ocrStatus}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  {/* Context menu content can be added here for other features if needed */}
+                </ContextMenuContent>
+              </ContextMenu>
             </div>
           </div>
 
@@ -512,9 +698,7 @@ export function EditorPage() {
             {showReferencePanel && (
               <div className="border-b border-gray-200 p-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">
-                    参照画像を選択（他のスライドやアップロード画像を参考に編集）
-                  </span>
+                  <span className="text-sm font-medium text-gray-700">参照画像を選択</span>
                   <Button
                     variant="outline"
                     size="sm"
@@ -534,61 +718,157 @@ export function EditorPage() {
                   />
                 </div>
 
+                {/* Tabs */}
+                <Tabs
+                  value={referenceTab}
+                  onValueChange={(v) => setReferenceTab(v as 'current' | 'uploaded' | 'history')}
+                  className="mb-2"
+                >
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="current" className="text-xs">
+                      現在のスライド
+                    </TabsTrigger>
+                    <TabsTrigger value="uploaded" className="text-xs">
+                      過去アップロードした画像
+                    </TabsTrigger>
+                    <TabsTrigger value="history" className="text-xs">
+                      履歴のスライド
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+
                 <ScrollArea className="h-28">
-                  {allReferences.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-                      <ImageIcon className="mr-2 h-4 w-4" />
-                      他のスライドがありません。画像をアップロードしてください。
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      {allReferences.map((ref) => (
-                        <div
-                          key={ref.id}
-                          className={cn(
-                            'relative flex-shrink-0 w-24 rounded-lg border-2 overflow-hidden cursor-pointer transition-all',
-                            selectedReferenceIds.has(ref.id)
-                              ? 'border-blue-500 ring-2 ring-blue-200'
-                              : 'border-gray-200 hover:border-gray-300'
-                          )}
-                          onClick={() => handleToggleReference(ref.id)}
-                        >
-                          <img
-                            src={ref.dataUrl}
-                            alt={ref.name}
-                            className="w-full aspect-video object-cover"
-                          />
-                          <div className="absolute top-1 left-1">
-                            <Checkbox
-                              checked={selectedReferenceIds.has(ref.id)}
-                              onCheckedChange={() => handleToggleReference(ref.id)}
-                              className="bg-white"
-                            />
-                          </div>
-                          {!ref.isSlide && (
-                            <button
-                              className="absolute top-1 right-1 p-0.5 bg-white rounded-full hover:bg-gray-100"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleRemoveUploadedImage(ref.id)
-                              }}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          )}
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
-                            <p className="text-[10px] text-white truncate">{ref.name}</p>
-                          </div>
+                  {(() => {
+                    let displayImages: ReferenceImage[] = []
+
+                    if (referenceTab === 'current') {
+                      // Current slides only (excluding selected slide)
+                      displayImages =
+                        project?.slides
+                          .filter((slide) => slide.id !== selectedSlideId)
+                          .map((slide) => {
+                            const imageData = getCurrentImageData(slide)
+                            return {
+                              id: `slide-${slide.id}`,
+                              dataUrl: imageData?.dataUrl || '',
+                              name: `スライド ${slide.pageNumber}`,
+                              isSlide: true,
+                              slideId: slide.id,
+                              width: imageData?.width,
+                              height: imageData?.height
+                            }
+                          }) || []
+                    } else if (referenceTab === 'uploaded') {
+                      // Uploaded images - only past reference images (not current session uploads)
+                      // Get all reference image IDs used in history across all slides
+                      const referenceImageIds = new Set<string>()
+                      project?.slides.forEach((slide) => {
+                        slide.editHistory.forEach((entry) => {
+                          entry.referenceImageIds?.forEach((id) => {
+                            referenceImageIds.add(id)
+                          })
+                        })
+                      })
+
+                      // Get slide image IDs to exclude them (they're not "uploaded")
+                      const slideImageIds = new Set<string>()
+                      project?.slides.forEach((slide) => {
+                        slideImageIds.add(slide.image.originalImageId)
+                        slideImageIds.add(slide.image.currentImageId)
+                        slide.editHistory.forEach((entry) => {
+                          slideImageIds.add(entry.resultImageId)
+                          slideImageIds.add(entry.sourceImageId)
+                        })
+                      })
+
+                      // Past reference images only
+                      const pastReferenceImages: ReferenceImage[] = Array.from(referenceImageIds)
+                        .filter((id) => !slideImageIds.has(id))
+                        .map((id) => {
+                          const img = project?.images[id]
+                          if (!img) return null
+                          return {
+                            id: `image-${img.id}`,
+                            dataUrl: img.dataUrl,
+                            name: `参照画像 #${img.order + 1}`,
+                            isSlide: false,
+                            width: img.width,
+                            height: img.height
+                          } as ReferenceImage
+                        })
+                        .filter((img): img is ReferenceImage => img !== null)
+
+                      displayImages = pastReferenceImages
+                    } else {
+                      // History slides - all result images from edit history
+                      const historyImages: ReferenceImage[] = []
+                      project?.slides.forEach((slide) => {
+                        slide.editHistory.forEach((entry, index) => {
+                          const img = project.images[entry.resultImageId]
+                          if (img) {
+                            historyImages.push({
+                              id: `history-${entry.id}`,
+                              dataUrl: img.dataUrl,
+                              name: `スライド ${slide.pageNumber} - 履歴 ${index + 1}`,
+                              isSlide: false,
+                              width: img.width,
+                              height: img.height
+                            })
+                          }
+                        })
+                      })
+                      displayImages = historyImages
+                    }
+
+                    if (displayImages.length === 0) {
+                      return (
+                        <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+                          <ImageIcon className="mr-2 h-4 w-4" />
+                          {referenceTab === 'uploaded'
+                            ? '画像をアップロードしてください'
+                            : referenceTab === 'history'
+                              ? '履歴がありません'
+                              : '他のスライドがありません'}
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      )
+                    }
+
+                    return (
+                      <div className="flex gap-2">
+                        {displayImages.map((ref) => (
+                          <div
+                            key={ref.id}
+                            className={cn(
+                              'relative flex-shrink-0 w-24 rounded-lg border-2 overflow-hidden cursor-pointer transition-all',
+                              'border-gray-200 hover:border-gray-300'
+                            )}
+                            onClick={() => handleToggleReference(ref.id)}
+                          >
+                            <img
+                              src={ref.dataUrl}
+                              alt={ref.name}
+                              className="w-full aspect-video object-cover"
+                            />
+                            {referenceTab === 'uploaded' && ref.id.startsWith('upload-') && (
+                              <button
+                                className="absolute top-1 right-1 p-0.5 bg-white rounded-full hover:bg-gray-100"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleRemoveUploadedImage(ref.id)
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            )}
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
+                              <p className="text-[10px] text-white truncate">{ref.name}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
                 </ScrollArea>
-                {selectedReferenceIds.size > 0 && (
-                  <p className="text-xs text-blue-600 mt-1">
-                    {selectedReferenceIds.size} 件の参照画像を選択中
-                  </p>
-                )}
               </div>
             )}
 
@@ -608,12 +888,113 @@ export function EditorPage() {
                         <ChevronUp className="h-4 w-4" />
                       )}
                       参照画像
-                      {selectedReferenceIds.size > 0 && (
-                        <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">
-                          {selectedReferenceIds.size}
-                        </span>
-                      )}
                     </Button>
+
+                    {/* Selected References - shown next to the button */}
+                    {selectedReferenceIds.size > 0 && (
+                      <>
+                        <div className="flex-1 flex items-center gap-2 overflow-x-auto">
+                          {Array.from(selectedReferenceIds).map((id) => {
+                            const ref = (() => {
+                              // Find in uploaded images
+                              const uploaded = uploadedImages.find((img) => img.id === id)
+                              if (uploaded) return uploaded
+
+                              // Find in current slides
+                              if (id.startsWith('slide-')) {
+                                const slideId = id.replace('slide-', '')
+                                const slide = project?.slides.find((s) => s.id === slideId)
+                                if (slide) {
+                                  const imageData = getCurrentImageData(slide)
+                                  return {
+                                    id,
+                                    dataUrl: imageData?.dataUrl || '',
+                                    name: `スライド ${slide.pageNumber}`,
+                                    isSlide: true,
+                                    slideId: slide.id,
+                                    width: imageData?.width,
+                                    height: imageData?.height
+                                  }
+                                }
+                              }
+
+                              // Find in uploaded reference images
+                              if (id.startsWith('image-')) {
+                                const imageId = id.replace('image-', '')
+                                const img = project?.images[imageId]
+                                if (img) {
+                                  return {
+                                    id,
+                                    dataUrl: img.dataUrl,
+                                    name: `参照画像 #${img.order + 1}`,
+                                    isSlide: false,
+                                    width: img.width,
+                                    height: img.height
+                                  }
+                                }
+                              }
+
+                              // Find in history
+                              if (id.startsWith('history-')) {
+                                const entryId = id.replace('history-', '')
+                                for (const slide of project?.slides || []) {
+                                  const entry = slide.editHistory.find((e) => e.id === entryId)
+                                  if (entry) {
+                                    const img = project.images[entry.resultImageId]
+                                    if (img) {
+                                      const index = slide.editHistory.indexOf(entry)
+                                      return {
+                                        id,
+                                        dataUrl: img.dataUrl,
+                                        name: `スライド ${slide.pageNumber} - 履歴 ${index + 1}`,
+                                        isSlide: false,
+                                        width: img.width,
+                                        height: img.height
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+
+                              return null
+                            })()
+
+                            if (!ref) return null
+
+                            return (
+                              <div
+                                key={id}
+                                className="relative flex-shrink-0 w-12 h-8 rounded border-2 border-blue-500 overflow-hidden"
+                              >
+                                <img
+                                  src={ref.dataUrl}
+                                  alt={ref.name}
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl hover:bg-red-600"
+                                  onClick={() => {
+                                    const newSet = new Set(selectedReferenceIds)
+                                    newSet.delete(id)
+                                    setSelectedReferenceIds(newSet)
+                                  }}
+                                >
+                                  <X className="h-2 w-2" />
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedReferenceIds(new Set())}
+                          className="h-7 text-xs flex-shrink-0"
+                        >
+                          すべて解除
+                        </Button>
+                      </>
+                    )}
                   </div>
                   <Textarea
                     value={prompt}
@@ -623,11 +1004,11 @@ export function EditorPage() {
                     disabled={isEditing}
                   />
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 justify-end">
                   <Button
                     onClick={handleEdit}
                     disabled={isEditing || !prompt.trim()}
-                    className="h-full min-w-[100px]"
+                    className="min-w-[100px]"
                   >
                     {isEditing ? (
                       <>
@@ -679,16 +1060,11 @@ export function EditorPage() {
             <TabsContent value="history" className="mt-4">
               <ScrollArea className="h-[calc(100vh-250px)]">
                 {selectedSlide.editHistory.length === 0 ? (
-                  <div className="py-8 text-center text-gray-500">
-                    まだ編集履歴がありません
-                  </div>
+                  <div className="py-8 text-center text-gray-500">まだ編集履歴がありません</div>
                 ) : (
                   <div className="space-y-4">
                     {[...selectedSlide.editHistory].reverse().map((entry) => (
-                      <div
-                        key={entry.id}
-                        className="rounded-lg border border-gray-200 p-3"
-                      >
+                      <div key={entry.id} className="rounded-lg border border-gray-200 p-3">
                         <div className="mb-2 flex items-start justify-between">
                           <span className="text-xs text-gray-500">
                             {new Date(entry.timestamp).toLocaleString('ja-JP')}
@@ -703,38 +1079,49 @@ export function EditorPage() {
                           </Button>
                         </div>
                         <p className="mb-2 text-sm text-gray-700">{entry.prompt}</p>
-                        {entry.referenceImages && entry.referenceImages.length > 0 && (
+                        {entry.referenceImageIds && entry.referenceImageIds.length > 0 && (
                           <div className="mb-2">
                             <p className="mb-1 text-xs text-gray-500">参照画像</p>
                             <div className="flex gap-1 flex-wrap">
-                              {entry.referenceImages.map((ref, idx) => (
-                                <div key={idx} className="relative w-12 h-8 rounded border border-gray-200 overflow-hidden" title={ref.name}>
-                                  <img
-                                    src={ref.dataUrl}
-                                    alt={ref.name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                              ))}
+                              {entry.referenceImageIds.map((refId) => {
+                                const refImage = project.images[refId]
+                                if (!refImage) return null
+                                return (
+                                  <div
+                                    key={refId}
+                                    className="relative w-12 h-8 rounded border border-gray-200 overflow-hidden"
+                                  >
+                                    <img
+                                      src={refImage.dataUrl}
+                                      alt="参照画像"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                )
+                              })}
                             </div>
                           </div>
                         )}
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <p className="mb-1 text-xs text-gray-500">Before</p>
-                            <img
-                              src={entry.sourceImageDataUrl}
-                              alt="Before"
-                              className="w-full rounded border border-gray-200"
-                            />
+                            {project.images[entry.sourceImageId] && (
+                              <img
+                                src={project.images[entry.sourceImageId].dataUrl}
+                                alt="Before"
+                                className="w-full rounded border border-gray-200"
+                              />
+                            )}
                           </div>
                           <div>
                             <p className="mb-1 text-xs text-gray-500">After</p>
-                            <img
-                              src={entry.resultImageDataUrl}
-                              alt="After"
-                              className="w-full rounded border border-gray-200"
-                            />
+                            {project.images[entry.resultImageId] && (
+                              <img
+                                src={project.images[entry.resultImageId].dataUrl}
+                                alt="After"
+                                className="w-full rounded border border-gray-200"
+                              />
+                            )}
                           </div>
                         </div>
                       </div>
@@ -748,25 +1135,31 @@ export function EditorPage() {
               <div className="space-y-4">
                 <div>
                   <h4 className="mb-2 text-sm font-medium">オリジナル画像</h4>
-                  <img
-                    src={selectedSlide.image.originalDataUrl}
-                    alt="Original"
-                    className="w-full rounded-lg border border-gray-200"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2 w-full"
-                    onClick={() => {
-                      addEditHistory(selectedSlide.id, {
-                        sourceImageDataUrl: selectedSlide.image.currentDataUrl,
-                        prompt: 'オリジナルに戻す',
-                        resultImageDataUrl: selectedSlide.image.originalDataUrl
-                      })
-                    }}
-                  >
-                    オリジナルに戻す
-                  </Button>
+                  {getOriginalImageData(selectedSlide) && (
+                    <>
+                      <img
+                        src={getOriginalImageData(selectedSlide)!.dataUrl}
+                        alt="Original"
+                        className="w-full rounded-lg border border-gray-200"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 w-full"
+                        onClick={() => {
+                          const originalImg = getOriginalImageData(selectedSlide)
+                          if (originalImg) {
+                            addEditHistory(selectedSlide.id, {
+                              prompt: 'オリジナルに戻す',
+                              resultImageDataUrl: originalImg.dataUrl
+                            })
+                          }
+                        }}
+                      >
+                        オリジナルに戻す
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             </TabsContent>
