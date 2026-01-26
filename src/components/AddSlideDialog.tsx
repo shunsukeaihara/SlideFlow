@@ -165,7 +165,7 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
         const entryId = id.replace('history-', '')
         for (const slide of project?.slides || []) {
           const entry = slide.editHistory.find((e) => e.id === entryId)
-          if (entry) {
+          if (entry && project) {
             const img = project.images[entry.resultImageId]
             if (img) {
               const index = slide.editHistory.indexOf(entry)
