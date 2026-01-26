@@ -33,6 +33,10 @@ export interface OcrTextBlock {
   text: string
   bbox: { x: number; y: number; width: number; height: number }
   confidence?: number
+  lines?: Array<{
+    text: string
+    bbox: { x: number; y: number; width: number; height: number }
+  }>
 }
 
 export interface OcrResult {

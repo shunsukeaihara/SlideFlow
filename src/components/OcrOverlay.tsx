@@ -1,16 +1,28 @@
 import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { X } from 'lucide-react'
+import { Copy } from 'lucide-react'
 import type { OcrResult } from '@/types/project'
 
 interface OcrOverlayProps {
   ocrResult: OcrResult
   imageElement: HTMLImageElement
-  onClose: () => void
 }
 
-export function OcrOverlay({ ocrResult, imageElement, onClose }: OcrOverlayProps) {
+interface ContextMenu {
+  x: number
+  y: number
+  blockIndex: number
+}
+
+interface PopupPosition {
+  x: number
+  y: number
+}
+
+export function OcrOverlay({ ocrResult, imageElement }: OcrOverlayProps) {
   const [scale, setScale] = useState({ x: 1, y: 1 })
+  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
+  const [hoveredBlock, setHoveredBlock] = useState<number | null>(null)
+  const [popupPosition, setPopupPosition] = useState<PopupPosition | null>(null)
 
   useEffect(() => {
     const updateScale = () => {
@@ -27,6 +39,47 @@ export function OcrOverlay({ ocrResult, imageElement, onClose }: OcrOverlayProps
     return () => window.removeEventListener('resize', updateScale)
   }, [imageElement])
 
+  useEffect(() => {
+    // Close context menu when clicking anywhere
+    const handleDocumentClick = () => setContextMenu(null)
+    document.addEventListener('click', handleDocumentClick)
+    return () => document.removeEventListener('click', handleDocumentClick)
+  }, [])
+
+  const handleMouseEnter = (blockIndex: number, e: React.MouseEvent) => {
+    setHoveredBlock(blockIndex)
+    const rect = e.currentTarget.getBoundingClientRect()
+    setPopupPosition({
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10
+    })
+  }
+
+  const handleMouseLeave = () => {
+    setHoveredBlock(null)
+    setPopupPosition(null)
+  }
+
+  const handleClick = (e: React.MouseEvent, blockIndex: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      blockIndex
+    })
+  }
+
+  const handleCopyText = async (blockIndex: number) => {
+    const text = ocrResult.textBlocks[blockIndex].text
+    try {
+      await navigator.clipboard.writeText(text)
+      setContextMenu(null)
+    } catch (err) {
+      console.error('Failed to copy text:', err)
+    }
+  }
+
   return (
     <div
       className="absolute inset-0"
@@ -34,20 +87,8 @@ export function OcrOverlay({ ocrResult, imageElement, onClose }: OcrOverlayProps
         pointerEvents: 'none'
       }}
     >
-      {/* Close button */}
-      <div className="absolute right-2 top-2" style={{ pointerEvents: 'auto' }}>
-        <Button
-          onClick={onClose}
-          variant="destructive"
-          size="icon"
-          className="h-8 w-8 rounded-full shadow-lg"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* Text blocks */}
-      {ocrResult.textBlocks.map((block, index) => {
+      {/* Block bounding boxes */}
+      {ocrResult.textBlocks.map((block, blockIndex) => {
         const scaledBox = {
           left: block.bbox.x * scale.x,
           top: block.bbox.y * scale.y,
@@ -57,34 +98,61 @@ export function OcrOverlay({ ocrResult, imageElement, onClose }: OcrOverlayProps
 
         return (
           <div
-            key={index}
-            className="absolute cursor-text select-text overflow-hidden border border-yellow-500/50 bg-yellow-200/20 transition-colors hover:border-yellow-500/80 hover:bg-yellow-200/30"
+            key={blockIndex}
+            className="absolute cursor-pointer transition-colors hover:bg-blue-500/20"
             style={{
               left: `${scaledBox.left}px`,
               top: `${scaledBox.top}px`,
               width: `${scaledBox.width}px`,
               height: `${scaledBox.height}px`,
               pointerEvents: 'auto',
-              whiteSpace: 'pre-wrap',
-              fontSize: `${scaledBox.height * 0.8}px`,
-              lineHeight: `${scaledBox.height}px`,
-              color: 'transparent'
+              border: '2px solid rgba(59, 130, 246, 0.6)',
+              borderRadius: '4px'
             }}
-            title={block.text}
-          >
-            {block.text}
-          </div>
+            onMouseEnter={(e) => handleMouseEnter(blockIndex, e)}
+            onMouseLeave={handleMouseLeave}
+            onClick={(e) => handleClick(e, blockIndex)}
+          />
         )
       })}
 
-      {/* Full text display (for easy copying) */}
-      <div
-        className="absolute bottom-2 left-2 right-2 max-h-32 overflow-auto rounded-lg border border-gray-300 bg-white/90 p-2 text-xs shadow-lg backdrop-blur-sm"
-        style={{ pointerEvents: 'auto' }}
-      >
-        <div className="mb-1 font-semibold">全文テキスト:</div>
-        <div className="select-text whitespace-pre-wrap">{ocrResult.fullText}</div>
-      </div>
+      {/* Popup tooltip */}
+      {hoveredBlock !== null && popupPosition && (
+        <div
+          className="fixed z-50 max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-lg"
+          style={{
+            left: `${popupPosition.x}px`,
+            top: `${popupPosition.y}px`,
+            transform: 'translate(-50%, -100%)',
+            pointerEvents: 'none'
+          }}
+        >
+          <div className="select-text whitespace-pre-wrap break-words">
+            {ocrResult.textBlocks[hoveredBlock].text}
+          </div>
+        </div>
+      )}
+
+      {/* Context menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 rounded-lg border border-gray-300 bg-white shadow-lg"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+            pointerEvents: 'auto'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100"
+            onClick={() => handleCopyText(contextMenu.blockIndex)}
+          >
+            <Copy className="h-4 w-4" />
+            テキストをコピー
+          </button>
+        </div>
+      )}
     </div>
   )
 }

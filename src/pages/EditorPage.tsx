@@ -32,7 +32,10 @@ import {
   X,
   ImageIcon,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Eye,
+  EyeOff,
+  ScanText
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -58,6 +61,7 @@ import { OcrButton } from '@/components/OcrButton'
 import { OcrOverlay } from '@/components/OcrOverlay'
 import { useProjectStore } from '@/stores/projectStore'
 import { editImage, isGeminiInitialized, initializeGemini } from '@/lib/gemini'
+import { extractText } from '@/lib/ocr'
 import { createPdfFromImages } from '@/lib/pdf'
 import { saveProjectToZip, getProjectFileName } from '@/lib/projectFile'
 import { cn } from '@/lib/utils'
@@ -180,6 +184,11 @@ export function EditorPage() {
   const [uploadedImages, setUploadedImages] = useState<ReferenceImage[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
+  const imageContainerRef = useRef<HTMLDivElement>(null)
+  const [showOcrOverlay, setShowOcrOverlay] = useState(true)
+  const [isOcrProcessing, setIsOcrProcessing] = useState(false)
+  const [ocrStatus, setOcrStatus] = useState('')
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
 
   const {
     project,
@@ -190,7 +199,8 @@ export function EditorPage() {
     revertToHistory,
     reorderSlides,
     deleteSlide,
-    clearSlideOcrResult
+    clearSlideOcrResult,
+    setSlideOcrResult
   } = useProjectStore()
 
   const sensors = useSensors(

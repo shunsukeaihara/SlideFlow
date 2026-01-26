@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useProjectStore } from '@/stores/projectStore'
 import { extractText } from '@/lib/ocr'
+import { Loader2, ScanText } from 'lucide-react'
 
 interface OcrButtonProps {
   slideId: string
@@ -21,11 +22,6 @@ export function OcrButton({ slideId, disabled }: OcrButtonProps) {
 
   const handleOcrClick = async () => {
     if (!slide) return
-
-    // If OCR result already exists, it will be displayed by OcrOverlay in EditorPage
-    if (slide.ocrCache) {
-      return
-    }
 
     setIsProcessing(true)
     setError(null)
@@ -53,7 +49,17 @@ export function OcrButton({ slideId, disabled }: OcrButtonProps) {
         variant="outline"
         size="sm"
       >
-        {isProcessing ? status : slide?.ocrCache ? 'OCR結果を表示' : 'OCRを実行'}
+        {isProcessing ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            {status}
+          </>
+        ) : (
+          <>
+            <ScanText className="mr-2 h-4 w-4" />
+            {slide?.ocrCache ? 'OCRを再実行' : 'OCRを実行'}
+          </>
+        )}
       </Button>
       {error && <div className="text-sm text-red-500">{error}</div>}
     </div>
