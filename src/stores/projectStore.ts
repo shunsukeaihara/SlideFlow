@@ -1,5 +1,12 @@
 import { create } from 'zustand'
-import type { Project, Slide, EditHistoryEntry, AppSettings, ReferenceImageData } from '@/types/project'
+import type {
+  Project,
+  Slide,
+  EditHistoryEntry,
+  AppSettings,
+  ReferenceImageData,
+  OcrResult
+} from '@/types/project'
 import { v4 as uuidv4 } from 'uuid'
 
 interface ProjectState {
@@ -33,6 +40,10 @@ interface ProjectState {
     }
   ) => void
   deleteSlide: (slideId: string) => void
+
+  // OCR actions
+  setSlideOcrResult: (slideId: string, ocrResult: OcrResult) => void
+  clearSlideOcrResult: (slideId: string) => void
 }
 
 const defaultAppSettings: AppSettings = {
@@ -284,6 +295,36 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         slides: updatedSlides
       },
       selectedSlideId: newSelectedId
+    })
+  },
+
+  setSlideOcrResult: (slideId, ocrResult) => {
+    const { project } = get()
+    if (!project) return
+
+    set({
+      project: {
+        ...project,
+        updatedAt: Date.now(),
+        slides: project.slides.map((slide) =>
+          slide.id === slideId ? { ...slide, ocrCache: ocrResult } : slide
+        )
+      }
+    })
+  },
+
+  clearSlideOcrResult: (slideId) => {
+    const { project } = get()
+    if (!project) return
+
+    set({
+      project: {
+        ...project,
+        updatedAt: Date.now(),
+        slides: project.slides.map((slide) =>
+          slide.id === slideId ? { ...slide, ocrCache: undefined } : slide
+        )
+      }
     })
   }
 }))

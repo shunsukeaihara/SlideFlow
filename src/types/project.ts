@@ -29,11 +29,28 @@ export interface EditHistoryEntry {
   referenceImages?: ReferenceImageData[]
 }
 
+export interface OcrTextBlock {
+  text: string
+  bbox: { x: number; y: number; width: number; height: number }
+  confidence?: number
+}
+
+export interface OcrResult {
+  textBlocks: OcrTextBlock[]
+  fullText: string
+  metadata: {
+    tesseractRaw: OcrTextBlock[]
+    engine: 'tesseract+gemini'
+    timestamp: number
+  }
+}
+
 export interface Slide {
   id: string
   pageNumber: number
   image: SlideImage
   editHistory: EditHistoryEntry[]
+  ocrCache?: OcrResult
 }
 
 export interface ProjectSettings {

@@ -54,6 +54,8 @@ import {
 } from '@/components/ui/context-menu'
 import { AddSlideDialog } from '@/components/AddSlideDialog'
 import { Checkbox } from '@/components/ui/checkbox'
+import { OcrButton } from '@/components/OcrButton'
+import { OcrOverlay } from '@/components/OcrOverlay'
 import { useProjectStore } from '@/stores/projectStore'
 import { editImage, isGeminiInitialized, initializeGemini } from '@/lib/gemini'
 import { createPdfFromImages } from '@/lib/pdf'
@@ -177,6 +179,7 @@ export function EditorPage() {
   const [selectedReferenceIds, setSelectedReferenceIds] = useState<Set<string>>(new Set())
   const [uploadedImages, setUploadedImages] = useState<ReferenceImage[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageRef = useRef<HTMLImageElement>(null)
 
   const {
     project,
@@ -186,7 +189,8 @@ export function EditorPage() {
     addEditHistory,
     revertToHistory,
     reorderSlides,
-    deleteSlide
+    deleteSlide,
+    clearSlideOcrResult
   } = useProjectStore()
 
   const sensors = useSensors(
@@ -497,12 +501,28 @@ export function EditorPage() {
         <main className="flex flex-1 flex-col overflow-hidden">
           {/* Slide Preview */}
           <div className="flex-1 overflow-auto bg-gray-100 p-6">
+            {/* OCR Toolbar */}
+            <div className="mx-auto mb-4 flex max-w-fit items-center gap-2">
+              <OcrButton slideId={selectedSlide.id} disabled={isEditing} />
+            </div>
+
+            {/* Image Display Area */}
             <div className="mx-auto flex h-full items-center justify-center">
-              <img
-                src={selectedSlide.image.currentDataUrl}
-                alt={`Slide ${selectedSlide.pageNumber}`}
-                className="max-h-full max-w-full rounded-lg shadow-lg"
-              />
+              <div className="relative">
+                <img
+                  ref={imageRef}
+                  src={selectedSlide.image.currentDataUrl}
+                  alt={`Slide ${selectedSlide.pageNumber}`}
+                  className="max-h-full max-w-full rounded-lg shadow-lg"
+                />
+                {selectedSlide.ocrCache && imageRef.current && (
+                  <OcrOverlay
+                    ocrResult={selectedSlide.ocrCache}
+                    imageElement={imageRef.current}
+                    onClose={() => clearSlideOcrResult(selectedSlide.id)}
+                  />
+                )}
+              </div>
             </div>
           </div>
 
