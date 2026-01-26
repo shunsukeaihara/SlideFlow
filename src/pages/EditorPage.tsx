@@ -57,7 +57,6 @@ import {
 } from '@/components/ui/context-menu'
 import { AddSlideDialog } from '@/components/AddSlideDialog'
 import { Checkbox } from '@/components/ui/checkbox'
-import { OcrButton } from '@/components/OcrButton'
 import { OcrOverlay } from '@/components/OcrOverlay'
 import { useProjectStore } from '@/stores/projectStore'
 import { editImage, isGeminiInitialized, initializeGemini } from '@/lib/gemini'
@@ -466,7 +465,12 @@ export function EditorPage() {
     const updateContainerSize = () => {
       if (imageContainerRef.current) {
         const rect = imageContainerRef.current.getBoundingClientRect()
-        setContainerSize({ width: rect.width, height: rect.height })
+        // Account for padding (p-6 = 24px on each side)
+        const padding = 24 * 2
+        setContainerSize({
+          width: rect.width - padding,
+          height: rect.height - padding
+        })
       }
     }
 
@@ -481,7 +485,12 @@ export function EditorPage() {
     const updateContainerSize = () => {
       if (imageContainerRef.current) {
         const rect = imageContainerRef.current.getBoundingClientRect()
-        setContainerSize({ width: rect.width, height: rect.height })
+        // Account for padding (p-6 = 24px on each side)
+        const padding = 24 * 2
+        setContainerSize({
+          width: rect.width - padding,
+          height: rect.height - padding
+        })
       }
     }
 
@@ -564,13 +573,17 @@ export function EditorPage() {
         {/* Center - Main Editor */}
         <main className="flex flex-1 flex-col overflow-hidden">
           {/* Slide Preview */}
-          <div ref={imageContainerRef} className="flex-1 overflow-hidden bg-gray-100 p-6">
+          <div ref={imageContainerRef} className="flex-1 overflow-hidden bg-gray-100 p-6" style={{ minHeight: 0 }}>
             <div className="h-full w-full flex items-center justify-center">
               <ContextMenu>
                 <ContextMenuTrigger asChild>
                   <div className="relative" style={{
-                    maxHeight: containerSize.height > 0 ? `${containerSize.height}px` : '100%',
-                    maxWidth: containerSize.width > 0 ? `${containerSize.width}px` : '100%'
+                    maxHeight: '100%',
+                    maxWidth: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}>
                     <img
                       ref={imageRef}
@@ -764,11 +777,11 @@ export function EditorPage() {
                     disabled={isEditing}
                   />
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 justify-end">
                   <Button
                     onClick={handleEdit}
                     disabled={isEditing || !prompt.trim()}
-                    className="h-full min-w-[100px]"
+                    className="min-w-[100px]"
                   >
                     {isEditing ? (
                       <>
@@ -792,7 +805,6 @@ export function EditorPage() {
                     履歴
                     <ChevronRight className="h-4 w-4" />
                   </Button>
-                  <OcrButton slideId={selectedSlide.id} disabled={isEditing} />
                 </div>
               </div>
             </div>

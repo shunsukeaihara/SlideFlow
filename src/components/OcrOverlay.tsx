@@ -20,6 +20,7 @@ interface PopupPosition {
 
 export function OcrOverlay({ ocrResult, imageElement }: OcrOverlayProps) {
   const [scale, setScale] = useState({ x: 1, y: 1 })
+  const [imagePosition, setImagePosition] = useState({ left: 0, top: 0 })
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
   const [hoveredBlock, setHoveredBlock] = useState<number | null>(null)
   const [popupPosition, setPopupPosition] = useState<PopupPosition | null>(null)
@@ -29,6 +30,16 @@ export function OcrOverlay({ ocrResult, imageElement }: OcrOverlayProps) {
       const scaleX = imageElement.offsetWidth / imageElement.naturalWidth
       const scaleY = imageElement.offsetHeight / imageElement.naturalHeight
       setScale({ x: scaleX, y: scaleY })
+
+      // Get the actual position of the image relative to its parent
+      const parentRect = imageElement.parentElement?.getBoundingClientRect()
+      const imageRect = imageElement.getBoundingClientRect()
+      if (parentRect) {
+        setImagePosition({
+          left: imageRect.left - parentRect.left,
+          top: imageRect.top - parentRect.top
+        })
+      }
     }
 
     // Initial scale calculation
@@ -36,7 +47,17 @@ export function OcrOverlay({ ocrResult, imageElement }: OcrOverlayProps) {
 
     // Update scale on window resize
     window.addEventListener('resize', updateScale)
-    return () => window.removeEventListener('resize', updateScale)
+
+    // Use ResizeObserver to detect image size changes
+    const resizeObserver = new ResizeObserver(() => {
+      updateScale()
+    })
+    resizeObserver.observe(imageElement)
+
+    return () => {
+      window.removeEventListener('resize', updateScale)
+      resizeObserver.disconnect()
+    }
   }, [imageElement])
 
   useEffect(() => {
@@ -90,8 +111,8 @@ export function OcrOverlay({ ocrResult, imageElement }: OcrOverlayProps) {
       {/* Block bounding boxes */}
       {ocrResult.textBlocks.map((block, blockIndex) => {
         const scaledBox = {
-          left: block.bbox.x * scale.x,
-          top: block.bbox.y * scale.y,
+          left: imagePosition.left + block.bbox.x * scale.x,
+          top: imagePosition.top + block.bbox.y * scale.y,
           width: block.bbox.width * scale.x,
           height: block.bbox.height * scale.y
         }
