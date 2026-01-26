@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { Plus, Upload, X, Loader2, ImageIcon, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Upload, Loader2, ImageIcon, ChevronDown, ChevronUp, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -13,9 +13,14 @@ import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useProjectStore } from '@/stores/projectStore'
+import { useImageOperations } from '@/hooks/useImageOperations'
+import { useReferenceImages } from '@/hooks/useReferenceImages'
+import { useReferenceSelection } from '@/hooks/useReferenceSelection'
 import { editImage, isGeminiInitialized } from '@/lib/gemini'
+import { convertReferenceIdsToImageData } from '@/lib/referenceImageUtils'
+import { getReferencesByIds, getReferenceById } from '@/lib/getReferenceById'
 import { cn } from '@/lib/utils'
-import type { Slide } from '@/types/project'
+import type { ReferenceImage } from '@/types/referenceImage'
 
 interface AddSlideDialogProps {
   open: boolean
@@ -23,84 +28,33 @@ interface AddSlideDialogProps {
   insertIndex: number
 }
 
-interface ReferenceImage {
-  id: string
-  dataUrl: string
-  name: string
-  isSlide: boolean
-  slideId?: string
-  width?: number
-  height?: number
-}
-
 export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDialogProps) {
   const { project, addSlide } = useProjectStore()
   const [prompt, setPrompt] = useState('')
-  const [selectedReferenceIds, setSelectedReferenceIds] = useState<Set<string>>(new Set())
-  const [uploadedImages, setUploadedImages] = useState<ReferenceImage[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [showReferencePanel, setShowReferencePanel] = useState(false)
   const [referenceTab, setReferenceTab] = useState<'current' | 'uploaded' | 'history'>('current')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Helper function to get current image data
-  const getCurrentImageData = useCallback(
-    (slide: Slide | undefined) => {
-      if (!slide || !project?.images) return undefined
-      return project.images[slide.image.currentImageId]
-    },
-    [project?.images]
-  )
+  // Image operations
+  const { getCurrentImageData } = useImageOperations(project)
 
-  const handleToggleReference = useCallback((id: string) => {
-    setSelectedReferenceIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
-  }, [])
+  // Reference selection management
+  const {
+    selectedReferenceIds,
+    uploadedImages,
+    toggleReference,
+    handleFileUpload,
+    resetSelection
+  } = useReferenceSelection()
 
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files) return
-
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) return
-
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string
-
-        // Get image dimensions
-        const img = new window.Image()
-        img.onload = () => {
-          const id = `upload-${Date.now()}-${Math.random()}`
-          setUploadedImages((prev) => [
-            ...prev,
-            {
-              id,
-              dataUrl,
-              name: file.name,
-              isSlide: false,
-              width: img.width,
-              height: img.height
-            }
-          ])
-          setSelectedReferenceIds((prev) => new Set([...prev, id]))
-        }
-        img.src = dataUrl
-      }
-      reader.readAsDataURL(file)
-    })
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }, [])
+  // Build reference images (no need to exclude selected slide for AddSlideDialog)
+  const { currentSlideReferences, pastReferenceImages, historyImages } = useReferenceImages({
+    project,
+    selectedSlideId: null, // No selected slide in AddSlideDialog
+    uploadedImages,
+    getCurrentImageData
+  })
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) {
@@ -113,84 +67,21 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
       return
     }
 
-    // Build selected references array
-    const selectedReferences: ReferenceImage[] = []
-
-    selectedReferenceIds.forEach((id) => {
-      // Find in uploaded images
-      const uploaded = uploadedImages.find((img) => img.id === id)
-      if (uploaded) {
-        selectedReferences.push(uploaded)
-        return
-      }
-
-      // Find in current slides
-      if (id.startsWith('slide-')) {
-        const slideId = id.replace('slide-', '')
-        const slide = project?.slides.find((s) => s.id === slideId)
-        if (slide) {
-          const imageData = getCurrentImageData(slide)
-          selectedReferences.push({
-            id,
-            dataUrl: imageData?.dataUrl || '',
-            name: `スライド ${slide.pageNumber}`,
-            isSlide: true,
-            slideId: slide.id,
-            width: imageData?.width,
-            height: imageData?.height
-          })
-        }
-        return
-      }
-
-      // Find in uploaded reference images
-      if (id.startsWith('image-')) {
-        const imageId = id.replace('image-', '')
-        const img = project?.images[imageId]
-        if (img) {
-          selectedReferences.push({
-            id,
-            dataUrl: img.dataUrl,
-            name: `参照画像 #${img.order + 1}`,
-            isSlide: false,
-            width: img.width,
-            height: img.height
-          })
-        }
-        return
-      }
-
-      // Find in history
-      if (id.startsWith('history-')) {
-        const entryId = id.replace('history-', '')
-        for (const slide of project?.slides || []) {
-          const entry = slide.editHistory.find((e) => e.id === entryId)
-          if (entry) {
-            const img = project.images[entry.resultImageId]
-            if (img) {
-              const index = slide.editHistory.indexOf(entry)
-              selectedReferences.push({
-                id,
-                dataUrl: img.dataUrl,
-                name: `スライド ${slide.pageNumber} - 履歴 ${index + 1}`,
-                isSlide: false,
-                width: img.width,
-                height: img.height
-              })
-            }
-            break
-          }
-        }
-      }
-    })
-
     try {
       setIsGenerating(true)
+
+      // Get selected references
+      const selectedReferences = getReferencesByIds(
+        selectedReferenceIds,
+        project,
+        uploadedImages,
+        getCurrentImageData
+      )
 
       let resultImageDataUrl: string
 
       if (selectedReferences.length === 0) {
-        // 参照画像なし: プロジェクト内の最初のスライドを使用（サイズ参照のため）
+        // No reference images: use first slide of project (for size reference)
         const firstSlide = project?.slides[0]
         if (!firstSlide || !project) {
           alert('プロジェクトにスライドがありません。')
@@ -207,19 +98,17 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
           project?.settings.systemPrompt
         )
       } else if (selectedReferences.length === 1) {
-        // 参照画像1枚
+        // Single reference image
         resultImageDataUrl = await editImage(
           selectedReferences[0].dataUrl,
           prompt,
           project?.settings.systemPrompt
         )
       } else {
-        // 複数の参照画像: 最初の画像をベースに、他の画像の説明をプロンプトに含める
+        // Multiple reference images: use first as base, describe others in prompt
         const baseImage = selectedReferences[0]
         const additionalRefs = selectedReferences.slice(1)
-        const refDescription = additionalRefs
-          .map((ref, i) => `参照画像${i + 2}: ${ref.name}`)
-          .join('\n')
+        const refDescription = additionalRefs.map((ref, i) => `参照画像${i + 2}: ${ref.name}`).join('\n')
 
         const fullPrompt = `${prompt}\n\n追加の参照画像があります:\n${refDescription}\n\n※複数の参照画像のスタイルや内容を参考にしてください。`
 
@@ -230,7 +119,7 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
         )
       }
 
-      // 生成された画像のサイズを取得
+      // Get generated image dimensions
       const img = new Image()
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve()
@@ -238,45 +127,11 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
         img.src = resultImageDataUrl
       })
 
-      // 使用した参照画像を履歴に保存
-      // - 既存画像（image-*, history-*, slide-*）はIDのみを記録
-      // - 新規アップロード画像（upload-*）は新規としてimages辞書に追加
-
-      const existingImageIds: string[] = []
-      const newReferenceImages: Array<{
-        name: string
-        dataUrl: string
-        width: number
-        height: number
-      }> = []
-
-      selectedReferences.forEach((ref) => {
-        if (ref.id.startsWith('image-')) {
-          existingImageIds.push(ref.id.replace('image-', ''))
-        } else if (ref.id.startsWith('history-')) {
-          const entryId = ref.id.replace('history-', '')
-          for (const slide of project?.slides || []) {
-            const entry = slide.editHistory.find((e) => e.id === entryId)
-            if (entry) {
-              existingImageIds.push(entry.resultImageId)
-              break
-            }
-          }
-        } else if (ref.id.startsWith('slide-')) {
-          const slideId = ref.id.replace('slide-', '')
-          const slide = project?.slides.find((s) => s.id === slideId)
-          if (slide) {
-            existingImageIds.push(slide.image.currentImageId)
-          }
-        } else if (ref.id.startsWith('upload-') && ref.width && ref.height) {
-          newReferenceImages.push({
-            name: ref.name,
-            dataUrl: ref.dataUrl,
-            width: ref.width,
-            height: ref.height
-          })
-        }
-      })
+      // Convert reference IDs to image data
+      const { newReferenceImages } = convertReferenceIdsToImageData(
+        selectedReferences,
+        project
+      )
 
       addSlide(
         {
@@ -291,11 +146,10 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
         }
       )
 
-      // ダイアログを閉じてリセット
+      // Close dialog and reset
       onOpenChange(false)
       setPrompt('')
-      setSelectedReferenceIds(new Set())
-      setUploadedImages([])
+      resetSelection()
     } catch (error) {
       console.error('Failed to generate slide:', error)
       alert('スライドの生成に失敗しました。' + (error instanceof Error ? error.message : ''))
@@ -310,17 +164,17 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
     insertIndex,
     addSlide,
     onOpenChange,
-    getCurrentImageData
+    getCurrentImageData,
+    resetSelection
   ])
 
   const handleClose = useCallback(() => {
     if (!isGenerating) {
       onOpenChange(false)
       setPrompt('')
-      setSelectedReferenceIds(new Set())
-      setUploadedImages([])
+      resetSelection()
     }
-  }, [isGenerating, onOpenChange])
+  }, [isGenerating, onOpenChange, resetSelection])
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -382,76 +236,10 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
                   let displayImages: ReferenceImage[] = []
 
                   if (referenceTab === 'current') {
-                    // Current slides
-                    displayImages =
-                      project?.slides.map((slide) => {
-                        const imageData = getCurrentImageData(slide)
-                        return {
-                          id: `slide-${slide.id}`,
-                          dataUrl: imageData?.dataUrl || '',
-                          name: `スライド ${slide.pageNumber}`,
-                          isSlide: true,
-                          slideId: slide.id,
-                          width: imageData?.width,
-                          height: imageData?.height
-                        }
-                      }) || []
+                    displayImages = currentSlideReferences
                   } else if (referenceTab === 'uploaded') {
-                    // Past reference images only
-                    const referenceImageIds = new Set<string>()
-                    project?.slides.forEach((slide) => {
-                      slide.editHistory.forEach((entry) => {
-                        entry.referenceImageIds?.forEach((id) => {
-                          referenceImageIds.add(id)
-                        })
-                      })
-                    })
-
-                    const slideImageIds = new Set<string>()
-                    project?.slides.forEach((slide) => {
-                      slideImageIds.add(slide.image.originalImageId)
-                      slideImageIds.add(slide.image.currentImageId)
-                      slide.editHistory.forEach((entry) => {
-                        slideImageIds.add(entry.resultImageId)
-                        slideImageIds.add(entry.sourceImageId)
-                      })
-                    })
-
-                    const pastReferenceImages: ReferenceImage[] = Array.from(referenceImageIds)
-                      .filter((id) => !slideImageIds.has(id))
-                      .map((id) => {
-                        const img = project?.images[id]
-                        if (!img) return null
-                        return {
-                          id: `image-${img.id}`,
-                          dataUrl: img.dataUrl,
-                          name: `参照画像 #${img.order + 1}`,
-                          isSlide: false,
-                          width: img.width,
-                          height: img.height
-                        } as ReferenceImage
-                      })
-                      .filter((img): img is ReferenceImage => img !== null)
-
-                    displayImages = pastReferenceImages
+                    displayImages = [...pastReferenceImages, ...uploadedImages]
                   } else {
-                    // History slides
-                    const historyImages: ReferenceImage[] = []
-                    project?.slides.forEach((slide) => {
-                      slide.editHistory.forEach((entry, index) => {
-                        const img = project.images[entry.resultImageId]
-                        if (img) {
-                          historyImages.push({
-                            id: `history-${entry.id}`,
-                            dataUrl: img.dataUrl,
-                            name: `スライド ${slide.pageNumber} - 履歴 ${index + 1}`,
-                            isSlide: false,
-                            width: img.width,
-                            height: img.height
-                          })
-                        }
-                      })
-                    })
                     displayImages = historyImages
                   }
 
@@ -479,7 +267,7 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
                               ? 'border-blue-500 ring-2 ring-blue-200'
                               : 'border-gray-200 hover:border-gray-300'
                           )}
-                          onClick={() => handleToggleReference(ref.id)}
+                          onClick={() => toggleReference(ref.id)}
                         >
                           <img
                             src={ref.dataUrl}
@@ -498,7 +286,7 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
             </div>
           )}
 
-          {/* プロンプト入力 */}
+          {/* Prompt input */}
           <div className="flex-1 flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <Button
@@ -515,75 +303,12 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
                 参照画像
               </Button>
 
-              {/* Selected References - shown next to the button */}
+              {/* Selected References */}
               {selectedReferenceIds.size > 0 && (
                 <>
                   <div className="flex-1 flex items-center gap-2 overflow-x-auto">
                     {Array.from(selectedReferenceIds).map((id) => {
-                      const ref = (() => {
-                        // Find in uploaded images
-                        const uploaded = uploadedImages.find((img) => img.id === id)
-                        if (uploaded) return uploaded
-
-                        // Find in current slides
-                        if (id.startsWith('slide-')) {
-                          const slideId = id.replace('slide-', '')
-                          const slide = project?.slides.find((s) => s.id === slideId)
-                          if (slide) {
-                            const imageData = getCurrentImageData(slide)
-                            return {
-                              id,
-                              dataUrl: imageData?.dataUrl || '',
-                              name: `スライド ${slide.pageNumber}`,
-                              isSlide: true,
-                              slideId: slide.id,
-                              width: imageData?.width,
-                              height: imageData?.height
-                            }
-                          }
-                        }
-
-                        // Find in uploaded reference images
-                        if (id.startsWith('image-')) {
-                          const imageId = id.replace('image-', '')
-                          const img = project?.images[imageId]
-                          if (img) {
-                            return {
-                              id,
-                              dataUrl: img.dataUrl,
-                              name: `参照画像 #${img.order + 1}`,
-                              isSlide: false,
-                              width: img.width,
-                              height: img.height
-                            }
-                          }
-                        }
-
-                        // Find in history
-                        if (id.startsWith('history-')) {
-                          const entryId = id.replace('history-', '')
-                          for (const slide of project?.slides || []) {
-                            const entry = slide.editHistory.find((e) => e.id === entryId)
-                            if (entry && project) {
-                              const img = project.images[entry.resultImageId]
-                              if (img) {
-                                const index = slide.editHistory.indexOf(entry)
-                                return {
-                                  id,
-                                  dataUrl: img.dataUrl,
-                                  name: `スライド ${slide.pageNumber} - 履歴 ${index + 1}`,
-                                  isSlide: false,
-                                  width: img.width,
-                                  height: img.height
-                                }
-                              }
-                            }
-                          }
-                        }
-
-                        return null
-                      })()
-
+                      const ref = getReferenceById(id, project, uploadedImages, getCurrentImageData)
                       if (!ref) return null
 
                       return (
@@ -598,11 +323,7 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
                           />
                           <button
                             className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl hover:bg-red-600"
-                            onClick={() => {
-                              const newSet = new Set(selectedReferenceIds)
-                              newSet.delete(id)
-                              setSelectedReferenceIds(newSet)
-                            }}
+                            onClick={() => toggleReference(id)}
                           >
                             <X className="h-2 w-2" />
                           </button>
@@ -613,7 +334,7 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setSelectedReferenceIds(new Set())}
+                    onClick={resetSelection}
                     className="h-7 text-xs flex-shrink-0"
                   >
                     すべて解除
