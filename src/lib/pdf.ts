@@ -1,17 +1,21 @@
 import * as pdfjs from 'pdfjs-dist'
-import type { SlideImage } from '@/types/project'
-import { v4 as uuidv4 } from 'uuid'
 
 // PDF.jsのワーカーを設定（Viteのアセットインポートを使用）
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
-export async function extractImagesFromPdf(file: File): Promise<SlideImage[]> {
+interface ExtractedImageData {
+  imageDataUrl: string
+  width: number
+  height: number
+}
+
+export async function extractImagesFromPdf(file: File): Promise<ExtractedImageData[]> {
   const arrayBuffer = await file.arrayBuffer()
   return extractImagesFromPdfData(arrayBuffer)
 }
 
-export async function extractImagesFromPdfBase64(base64: string): Promise<SlideImage[]> {
+export async function extractImagesFromPdfBase64(base64: string): Promise<ExtractedImageData[]> {
   const binaryString = atob(base64)
   const bytes = new Uint8Array(binaryString.length)
   for (let i = 0; i < binaryString.length; i++) {
@@ -20,9 +24,9 @@ export async function extractImagesFromPdfBase64(base64: string): Promise<SlideI
   return extractImagesFromPdfData(bytes.buffer)
 }
 
-async function extractImagesFromPdfData(data: ArrayBuffer): Promise<SlideImage[]> {
+async function extractImagesFromPdfData(data: ArrayBuffer): Promise<ExtractedImageData[]> {
   const pdf = await pdfjs.getDocument({ data }).promise
-  const slides: SlideImage[] = []
+  const slides: ExtractedImageData[] = []
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i)
@@ -44,10 +48,7 @@ async function extractImagesFromPdfData(data: ArrayBuffer): Promise<SlideImage[]
     const dataUrl = canvas.toDataURL('image/webp', 0.90)
 
     slides.push({
-      id: uuidv4(),
-      pageNumber: i,
-      originalDataUrl: dataUrl,
-      currentDataUrl: dataUrl,
+      imageDataUrl: dataUrl,
       width: viewport.width,
       height: viewport.height
     })

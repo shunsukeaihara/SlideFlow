@@ -4,10 +4,22 @@ import type {
   Slide,
   EditHistoryEntry,
   AppSettings,
-  ReferenceImageData,
-  OcrResult
+  OcrResult,
+  Image
 } from '@/types/project'
 import { v4 as uuidv4 } from 'uuid'
+
+// Helper function to detect file type from data URL
+function getFileTypeFromDataUrl(dataUrl: string): string {
+  const match = dataUrl.match(/^data:([^;]+);/)
+  return match ? match[1] : 'image/png'
+}
+
+// Helper function to get next image order
+function getNextImageOrder(images: Record<string, Image>): number {
+  const orders = Object.values(images).map((img) => img.order)
+  return orders.length > 0 ? Math.max(...orders) + 1 : 0
+}
 
 interface ProjectState {
   project: Project | null
@@ -20,14 +32,29 @@ interface ProjectState {
   setLoading: (loading: boolean) => void
 
   updateSlideImage: (slideId: string, newImageDataUrl: string) => void
-  addEditHistory: (slideId: string, entry: Omit<EditHistoryEntry, 'id' | 'timestamp'>) => void
+  addEditHistory: (
+    slideId: string,
+    entry: {
+      prompt: string
+      resultImageDataUrl: string
+      referenceImages?: Array<{ name: string; dataUrl: string; width: number; height: number }>
+      existingReferenceImageIds?: string[]
+    }
+  ) => void
   revertToHistory: (slideId: string, historyId: string) => void
 
   setApiKey: (apiKey: string) => void
   setSystemPrompt: (systemPrompt: string) => void
   loadApiKey: () => void
 
-  createProject: (name: string, slides: Omit<Slide, 'id' | 'editHistory'>[]) => Project
+  createProject: (
+    name: string,
+    slides: Array<{
+      imageDataUrl: string
+      width: number
+      height: number
+    }>
+  ) => Project
 
   // スライドの並べ替えと追加
   reorderSlides: (activeId: string, overId: string) => void
@@ -36,7 +63,7 @@ interface ProjectState {
     insertIndex: number,
     initialHistory?: {
       prompt: string
-      referenceImages?: ReferenceImageData[]
+      referenceImages?: Array<{ name: string; dataUrl: string; width: number; height: number }>
     }
   ) => void
   deleteSlide: (slideId: string) => void
@@ -68,17 +95,43 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const { project } = get()
     if (!project) return
 
+    // Find the slide to get image dimensions
+    const slide = project.slides.find((s) => s.id === slideId)
+    if (!slide) return
+
+    const currentImage = project.images[slide.image.currentImageId]
+    if (!currentImage) return
+
+    // Create new image data with unique ID
+    const newImageId = uuidv4()
+    const newImage: Image = {
+      id: newImageId,
+      order: getNextImageOrder(project.images),
+      dataUrl: newImageDataUrl,
+      fileType: getFileTypeFromDataUrl(newImageDataUrl),
+      width: currentImage.width,
+      height: currentImage.height
+      // No ocrCache - it's a new image
+    }
+
     set({
       project: {
         ...project,
         updatedAt: Date.now(),
-        slides: project.slides.map((slide) =>
-          slide.id === slideId
+        images: {
+          ...project.images,
+          [newImageId]: newImage
+        },
+        slides: project.slides.map((s) =>
+          s.id === slideId
             ? {
-                ...slide,
-                image: { ...slide.image, currentDataUrl: newImageDataUrl }
+                ...s,
+                image: {
+                  ...s.image,
+                  currentImageId: newImageId
+                }
               }
-            : slide
+            : s
         )
       }
     })
@@ -88,24 +141,73 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const { project } = get()
     if (!project) return
 
+    const slide = project.slides.find((s) => s.id === slideId)
+    if (!slide) return
+
+    const currentImage = project.images[slide.image.currentImageId]
+    if (!currentImage) return
+
+    // Create new image data for the result
+    const newImageId = uuidv4()
+    const newImage: Image = {
+      id: newImageId,
+      order: getNextImageOrder(project.images),
+      dataUrl: entry.resultImageDataUrl,
+      fileType: getFileTypeFromDataUrl(entry.resultImageDataUrl),
+      width: currentImage.width,
+      height: currentImage.height
+      // No ocrCache - it's a new image
+    }
+
+    // Add reference images to images dictionary and collect their IDs
+    const newImages: Record<string, Image> = {
+      [newImageId]: newImage
+    }
+    const referenceImageIds: string[] = [...(entry.existingReferenceImageIds || [])]
+
+    if (entry.referenceImages && entry.referenceImages.length > 0) {
+      entry.referenceImages.forEach((refImg) => {
+        const refImageId = uuidv4()
+        newImages[refImageId] = {
+          id: refImageId,
+          order: getNextImageOrder({ ...project.images, ...newImages }),
+          dataUrl: refImg.dataUrl,
+          fileType: getFileTypeFromDataUrl(refImg.dataUrl),
+          width: refImg.width,
+          height: refImg.height
+        }
+        referenceImageIds.push(refImageId)
+      })
+    }
+
     const newEntry: EditHistoryEntry = {
-      ...entry,
       id: uuidv4(),
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      sourceImageId: slide.image.currentImageId,
+      prompt: entry.prompt,
+      resultImageId: newImageId,
+      referenceImageIds: referenceImageIds.length > 0 ? referenceImageIds : undefined
     }
 
     set({
       project: {
         ...project,
         updatedAt: Date.now(),
-        slides: project.slides.map((slide) =>
-          slide.id === slideId
+        images: {
+          ...project.images,
+          ...newImages
+        },
+        slides: project.slides.map((s) =>
+          s.id === slideId
             ? {
-                ...slide,
-                image: { ...slide.image, currentDataUrl: entry.resultImageDataUrl },
-                editHistory: [...slide.editHistory, newEntry]
+                ...s,
+                image: {
+                  ...s.image,
+                  currentImageId: newImageId
+                },
+                editHistory: [...s.editHistory, newEntry]
               }
-            : slide
+            : s
         )
       }
     })
@@ -121,6 +223,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const historyEntry = slide.editHistory.find((h) => h.id === historyId)
     if (!historyEntry) return
 
+    // Simply update the currentImageId to point to the history image
+    // The image data (including ocrCache) is preserved in project.images
     set({
       project: {
         ...project,
@@ -129,7 +233,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           s.id === slideId
             ? {
                 ...s,
-                image: { ...s.image, currentDataUrl: historyEntry.resultImageDataUrl }
+                image: {
+                  ...s.image,
+                  currentImageId: historyEntry.resultImageId
+                }
               }
             : s
         )
@@ -164,19 +271,44 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     })
   },
 
-  createProject: (name, slides) => {
+  createProject: (name, slideData) => {
     const now = Date.now()
+    const images: Record<string, Image> = {}
+    let imageOrder = 0
+
+    const newSlides: Slide[] = slideData.map((data, index) => {
+      // Create image data for original and current (same initially)
+      const imageId = uuidv4()
+
+      images[imageId] = {
+        id: imageId,
+        order: imageOrder++,
+        dataUrl: data.imageDataUrl,
+        fileType: getFileTypeFromDataUrl(data.imageDataUrl),
+        width: data.width,
+        height: data.height
+      }
+
+      return {
+        id: uuidv4(),
+        pageNumber: index + 1,
+        image: {
+          id: uuidv4(),
+          pageNumber: index + 1,
+          originalImageId: imageId,
+          currentImageId: imageId // 最初は同じ画像
+        },
+        editHistory: []
+      }
+    })
+
     const newProject: Project = {
       id: uuidv4(),
       name,
       createdAt: now,
       updatedAt: now,
-      slides: slides.map((slide, index) => ({
-        ...slide,
-        id: uuidv4(),
-        pageNumber: index + 1,
-        editHistory: []
-      })),
+      slides: newSlides,
+      images,
       settings: {
         systemPrompt: ''
       }
@@ -217,16 +349,48 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     const newSlideId = uuidv4()
 
-    // 初期履歴エントリを作成（生成時のプロンプトと参照画像を保存）
+    // Create image data
+    const originalImageId = uuidv4()
+    const currentImageId = uuidv4()
+
+    const newImage: Image = {
+      id: originalImageId,
+      order: getNextImageOrder(project.images),
+      dataUrl: slideData.imageDataUrl,
+      fileType: getFileTypeFromDataUrl(slideData.imageDataUrl),
+      width: slideData.width,
+      height: slideData.height
+    }
+
+    // Add reference images to images dictionary and collect their IDs
+    const newImages: Record<string, Image> = {}
+    const referenceImageIds: string[] = []
+
+    if (initialHistory?.referenceImages && initialHistory.referenceImages.length > 0) {
+      initialHistory.referenceImages.forEach((refImg) => {
+        const refImageId = uuidv4()
+        newImages[refImageId] = {
+          id: refImageId,
+          order: getNextImageOrder({ ...project.images, ...newImages }),
+          dataUrl: refImg.dataUrl,
+          fileType: getFileTypeFromDataUrl(refImg.dataUrl),
+          width: refImg.width,
+          height: refImg.height
+        }
+        referenceImageIds.push(refImageId)
+      })
+    }
+
+    // 初期履歴エントリを作成（生成時のプロンプトと参照画像IDを保存）
     const editHistory: EditHistoryEntry[] = initialHistory
       ? [
           {
             id: uuidv4(),
             timestamp: Date.now(),
-            sourceImageDataUrl: slideData.imageDataUrl,
+            sourceImageId: originalImageId,
             prompt: initialHistory.prompt,
-            resultImageDataUrl: slideData.imageDataUrl,
-            referenceImages: initialHistory.referenceImages
+            resultImageId: currentImageId,
+            referenceImageIds: referenceImageIds.length > 0 ? referenceImageIds : undefined
           }
         ]
       : []
@@ -237,10 +401,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       image: {
         id: uuidv4(),
         pageNumber: insertIndex + 1,
-        originalDataUrl: slideData.imageDataUrl,
-        currentDataUrl: slideData.imageDataUrl,
-        width: slideData.width,
-        height: slideData.height
+        originalImageId,
+        currentImageId
       },
       editHistory
     }
@@ -259,7 +421,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       project: {
         ...project,
         updatedAt: Date.now(),
-        slides: updatedSlides
+        slides: updatedSlides,
+        images: {
+          ...project.images,
+          [originalImageId]: newImage,
+          [currentImageId]: newImage, // Same image initially
+          ...newImages // Add reference images
+        }
       },
       selectedSlideId: newSlideId
     })
@@ -302,13 +470,24 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const { project } = get()
     if (!project) return
 
+    const slide = project.slides.find((s) => s.id === slideId)
+    if (!slide) return
+
+    const currentImageId = slide.image.currentImageId
+    const currentImage = project.images[currentImageId]
+    if (!currentImage) return
+
     set({
       project: {
         ...project,
         updatedAt: Date.now(),
-        slides: project.slides.map((slide) =>
-          slide.id === slideId ? { ...slide, ocrCache: ocrResult } : slide
-        )
+        images: {
+          ...project.images,
+          [currentImageId]: {
+            ...currentImage,
+            ocrCache: ocrResult
+          }
+        }
       }
     })
   },
@@ -317,13 +496,24 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const { project } = get()
     if (!project) return
 
+    const slide = project.slides.find((s) => s.id === slideId)
+    if (!slide) return
+
+    const currentImageId = slide.image.currentImageId
+    const currentImage = project.images[currentImageId]
+    if (!currentImage) return
+
     set({
       project: {
         ...project,
         updatedAt: Date.now(),
-        slides: project.slides.map((slide) =>
-          slide.id === slideId ? { ...slide, ocrCache: undefined } : slide
-        )
+        images: {
+          ...project.images,
+          [currentImageId]: {
+            ...currentImage,
+            ocrCache: undefined
+          }
+        }
       }
     })
   }

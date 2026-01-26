@@ -1,16 +1,5 @@
-import { createWorker, type Worker } from 'tesseract.js'
+import { createWorker, type Worker, PSM } from 'tesseract.js'
 import type { OcrTextBlock } from '../types/project'
-
-interface TesseractWord {
-  text: string
-  bbox: {
-    x0: number
-    y0: number
-    x1: number
-    y1: number
-  }
-  confidence: number
-}
 
 export async function extractTextWithTesseract(dataUrl: string): Promise<OcrTextBlock[]> {
   let worker: Worker | null = null
@@ -26,7 +15,7 @@ export async function extractTextWithTesseract(dataUrl: string): Promise<OcrText
 
     // Set Tesseract parameters for better text detection
     await worker.setParameters({
-      tessedit_pageseg_mode: '11' // Sparse text. Find as much text as possible in no particular order
+      tessedit_pageseg_mode: PSM.SPARSE_TEXT // Sparse text. Find as much text as possible in no particular order
       // preserve_interword_spaces: '1' // Preserve spaces between words if needed
     })
 

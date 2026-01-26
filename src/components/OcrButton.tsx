@@ -19,16 +19,17 @@ export function OcrButton({ slideId, disabled }: OcrButtonProps) {
   const setSlideOcrResult = useProjectStore((state) => state.setSlideOcrResult)
 
   const slide = project?.slides.find((s) => s.id === slideId)
+  const currentImage = slide && project?.images[slide.image.currentImageId]
 
   const handleOcrClick = async () => {
-    if (!slide) return
+    if (!slide || !currentImage) return
 
     setIsProcessing(true)
     setError(null)
     setStatus('Tesseract実行中...')
 
     try {
-      const ocrResult = await extractText(slide.image.currentDataUrl, apiKey)
+      const ocrResult = await extractText(currentImage.dataUrl, apiKey)
 
       setSlideOcrResult(slideId, ocrResult)
       setStatus('')
@@ -57,7 +58,7 @@ export function OcrButton({ slideId, disabled }: OcrButtonProps) {
         ) : (
           <>
             <ScanText className="mr-2 h-4 w-4" />
-            {slide?.ocrCache ? 'OCRを再実行' : 'OCRを実行'}
+            {currentImage?.ocrCache ? 'OCRを再実行' : 'OCRを実行'}
           </>
         )}
       </Button>
