@@ -1,7 +1,7 @@
 import { Wand2, Loader2, History, ChevronRight, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import type { ReferenceImage } from './ReferenceImagePanel'
+import type { ReferenceImage } from '@/types/referenceImage'
 
 interface PromptInputAreaProps {
   prompt: string

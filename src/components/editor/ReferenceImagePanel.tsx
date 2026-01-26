@@ -4,16 +4,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
-
-export interface ReferenceImage {
-  id: string
-  dataUrl: string
-  name: string
-  isSlide: boolean
-  slideId?: string
-  width?: number
-  height?: number
-}
+import type { ReferenceImage } from '@/types/referenceImage'
 
 interface ReferenceImagePanelProps {
   currentSlides: ReferenceImage[]
