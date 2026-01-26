@@ -22,7 +22,7 @@ export function OcrButton({ slideId, disabled }: OcrButtonProps) {
   const handleOcrClick = async () => {
     if (!slide) return
 
-    // If OCR result already exists, show it immediately
+    // If OCR result already exists, it will be displayed by OcrOverlay in EditorPage
     if (slide.ocrCache) {
       return
     }

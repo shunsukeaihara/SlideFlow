@@ -501,12 +501,6 @@ export function EditorPage() {
         <main className="flex flex-1 flex-col overflow-hidden">
           {/* Slide Preview */}
           <div className="flex-1 overflow-auto bg-gray-100 p-6">
-            {/* OCR Toolbar */}
-            <div className="mx-auto mb-4 flex max-w-fit items-center gap-2">
-              <OcrButton slideId={selectedSlide.id} disabled={isEditing} />
-            </div>
-
-            {/* Image Display Area */}
             <div className="mx-auto flex h-full items-center justify-center">
               <div className="relative">
                 <img
@@ -671,6 +665,7 @@ export function EditorPage() {
                     履歴
                     <ChevronRight className="h-4 w-4" />
                   </Button>
+                  <OcrButton slideId={selectedSlide.id} disabled={isEditing} />
                 </div>
               </div>
             </div>
