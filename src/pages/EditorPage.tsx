@@ -471,8 +471,8 @@ export function EditorPage() {
 
         {/* Center - Main Editor */}
         <main className="flex flex-1 flex-col overflow-hidden">
-          {/* Slide Preview */}
-          <div className="flex-1 min-h-0 overflow-hidden h-full">
+          {/* Slide Preview with Reference Panel Overlay */}
+          <div className="flex-1 min-h-0 overflow-hidden h-full relative">
             <SlidePreview
               slideId={selectedSlide.id}
               slideNumber={selectedSlide.pageNumber}
@@ -482,6 +482,22 @@ export function EditorPage() {
               onExecuteOcr={handleOcrExecute}
               onClearOcr={() => clearSlideOcrResult(selectedSlide.id)}
             />
+
+            {/* Reference Panel - Overlay at bottom of SlidePreview */}
+            {showReferencePanel && (
+              <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg">
+                <ReferenceImagePanel
+                  currentSlides={currentSlideReferences}
+                  uploadedImages={[...pastReferenceImages, ...uploadedImages]}
+                  historyImages={historyImages}
+                  selectedReferenceIds={selectedReferenceIds}
+                  onToggleReference={handleToggleReference}
+                  onRemoveUploadedImage={handleRemoveUploadedImage}
+                  onFileUpload={handleFileUpload}
+                  isEditExecuting={isEditExecuting}
+                />
+              </div>
+            )}
           </div>
 
           {/* Resize Handle */}
@@ -494,18 +510,6 @@ export function EditorPage() {
 
           {/* Prompt Input */}
           <div className="border-t border-gray-200 bg-white flex flex-col overflow-hidden" style={{ height: `${inputAreaHeight}px` }}>
-            {showReferencePanel && (
-              <ReferenceImagePanel
-                currentSlides={currentSlideReferences}
-                uploadedImages={[...pastReferenceImages, ...uploadedImages]}
-                historyImages={historyImages}
-                selectedReferenceIds={selectedReferenceIds}
-                onToggleReference={handleToggleReference}
-                onRemoveUploadedImage={handleRemoveUploadedImage}
-                onFileUpload={handleFileUpload}
-                isEditExecuting={isEditExecuting}
-              />
-            )}
 
             <PromptInputArea
               prompt={prompt}
