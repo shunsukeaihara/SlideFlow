@@ -11,10 +11,10 @@ import { initializeGemini } from '@/lib/gemini'
 
 export function SettingsPage() {
   const navigate = useNavigate()
-  const { project, appSettings, setApiKey, setSystemPrompt } = useProjectStore()
+  const { project, appSettings, setApiKey, setBasePrompt } = useProjectStore()
 
   const [apiKeyInput, setApiKeyInput] = useState(appSettings.apiKey)
-  const [systemPromptInput, setSystemPromptInput] = useState(project?.settings.systemPrompt || '')
+  const [basePromptInput, setBasePromptInput] = useState(project?.settings.basePrompt || '')
   const [showApiKey, setShowApiKey] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -29,11 +29,11 @@ export function SettingsPage() {
       initializeGemini(apiKeyInput)
     }
     if (project) {
-      setSystemPrompt(systemPromptInput)
+      setBasePrompt(basePromptInput)
     }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
-  }, [apiKeyInput, systemPromptInput, project, setApiKey, setSystemPrompt])
+  }, [apiKeyInput, basePromptInput, project, setApiKey, setBasePrompt])
 
   return (
     <div className="flex h-full flex-col">
@@ -111,16 +111,16 @@ export function SettingsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <Label htmlFor="systemPrompt">システムプロンプト</Label>
+                  <Label htmlFor="basePrompt">共通プロンプト</Label>
                   <Textarea
-                    id="systemPrompt"
-                    value={systemPromptInput}
-                    onChange={(e) => setSystemPromptInput(e.target.value)}
-                    placeholder="すべての編集リクエストに適用されるシステムプロンプトを入力してください（例：日本語で応答してください。スライドのデザインを統一してください。）"
+                    id="basePrompt"
+                    value={basePromptInput}
+                    onChange={(e) => setBasePromptInput(e.target.value)}
+                    placeholder="すべての編集リクエストに共通で適用される指示を入力してください（例：日本語で応答してください。スライドのデザインを統一してください。）"
                     className="min-h-[120px]"
                   />
                   <p className="text-xs text-gray-500">
-                    システムプロンプトは、すべての画像編集リクエストの前に追加されます。
+                    共通プロンプトは、すべての画像編集・生成リクエストの先頭に追加されます。
                   </p>
                 </div>
               </CardContent>

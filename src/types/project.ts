@@ -54,7 +54,7 @@ export interface Slide {
 }
 
 export interface ProjectSettings {
-  systemPrompt: string
+  basePrompt: string
 }
 
 export interface Project {

@@ -294,7 +294,7 @@ export function EditorPage() {
       const resultImageDataUrl = await editImage(
         currentImageData.dataUrl,
         fullPrompt,
-        project?.settings.systemPrompt,
+        project?.settings.basePrompt,
         referenceImageDataUrls
       )
 

@@ -44,7 +44,7 @@ interface ProjectState {
   revertToHistory: (slideId: string, historyId: string) => void
 
   setApiKey: (apiKey: string) => void
-  setSystemPrompt: (systemPrompt: string) => void
+  setBasePrompt: (basePrompt: string) => void
   loadApiKey: () => void
 
   createProject: (
@@ -258,7 +258,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }))
   },
 
-  setSystemPrompt: (systemPrompt) => {
+  setBasePrompt: (basePrompt) => {
     const { project } = get()
     if (!project) return
 
@@ -266,7 +266,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       project: {
         ...project,
         updatedAt: Date.now(),
-        settings: { ...project.settings, systemPrompt }
+        settings: { ...project.settings, basePrompt }
       }
     })
   },
@@ -310,7 +310,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       slides: newSlides,
       images,
       settings: {
-        systemPrompt: ''
+        basePrompt: ''
       }
     }
     return newProject

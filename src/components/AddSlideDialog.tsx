@@ -94,7 +94,7 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
         }
         resultImageDataUrl = await generateImageFromReference(
           `以下のプロンプトに基づいて新しいスライドを生成してください。元の画像は参考程度にしてください。\n\n${prompt}`,
-          project?.settings.systemPrompt,
+          project?.settings.basePrompt,
           [firstImageData.dataUrl]
         )
       } else {
@@ -103,7 +103,7 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
 
         resultImageDataUrl = await generateImageFromReference(
           prompt,
-          project?.settings.systemPrompt,
+          project?.settings.basePrompt,
           referenceImageDataUrls
         )
       }

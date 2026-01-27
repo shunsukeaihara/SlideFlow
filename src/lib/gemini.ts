@@ -26,7 +26,7 @@ function dataUrlToBase64(dataUrl: string): { base64: string; mimeType: string } 
 export async function editImage(
   sourceImageDataUrl: string,
   prompt: string,
-  systemPrompt?: string,
+  basePrompt?: string,
   referenceImageDataUrls?: string[]
 ): Promise<string> {
   if (!geminiClient) {
@@ -44,8 +44,8 @@ export async function editImage(
     }
   }
 
-  const fullPrompt = systemPrompt
-    ? `${systemPrompt}\n\n${prompt}${imageRoleDescription}`
+  const fullPrompt = basePrompt
+    ? `${basePrompt}\n\n${prompt}${imageRoleDescription}`
     : `${prompt}${imageRoleDescription}`
 
   const contents: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
@@ -99,7 +99,7 @@ export async function editImage(
 
 export async function generateImageFromReference(
   prompt: string,
-  systemPrompt?: string,
+  basePrompt?: string,
   referenceImageDataUrls?: string[]
 ): Promise<string> {
   if (!geminiClient) {
@@ -115,8 +115,8 @@ export async function generateImageFromReference(
     }
   }
 
-  const fullPrompt = systemPrompt
-    ? `${systemPrompt}\n\n${prompt}${imageRoleDescription}`
+  const fullPrompt = basePrompt
+    ? `${basePrompt}\n\n${prompt}${imageRoleDescription}`
     : `${prompt}${imageRoleDescription}`
 
   const contents: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
