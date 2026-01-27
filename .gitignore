@@ -13,3 +13,6 @@ out
 next/.next/
 next/node_modules/
 next/.env.local
+
+# Environment
+.env

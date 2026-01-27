@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   // Enable Turbopack (moved from experimental.turbo)
   turbopack: {},
 
+  // Enable standalone output for Docker deployment
+  output: 'standalone',
+
   // Transpile shared src modules
   transpilePackages: [],
 
