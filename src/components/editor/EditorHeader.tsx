@@ -1,9 +1,10 @@
-import { useState } from 'react'
-import { ArrowLeft, Download, Save, Settings, Loader2, Menu, X } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { ArrowLeft, Download, Save, Settings, Loader2, Menu, X, Pencil, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { useProjectStore } from '@/stores/projectStore'
 
 interface EditorHeaderProps {
-  projectName: string
   isSaving: boolean
   onBack: () => void
   onSave: () => void
@@ -12,19 +13,80 @@ interface EditorHeaderProps {
 }
 
 export function EditorHeader({
-  projectName,
   isSaving,
   onBack,
   onSave,
   onExportPdf,
   onOpenSettings
 }: EditorHeaderProps) {
+  const { project, updateProjectName } = useProjectStore()
+  const projectName = project?.name ?? ''
+
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editName, setEditName] = useState(projectName)
+  const [isComposing, setIsComposing] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Update editName when projectName changes externally
+  useEffect(() => {
+    if (!isEditing) {
+      setEditName(projectName)
+    }
+  }, [projectName, isEditing])
+
+  // Focus input when entering edit mode
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [isEditing])
 
   const handleMenuAction = (action: () => void) => {
     action()
     setIsMenuOpen(false)
   }
+
+  const handleStartEdit = useCallback(() => {
+    setEditName(projectName)
+    setIsEditing(true)
+  }, [projectName])
+
+  const handleSaveName = useCallback(() => {
+    const trimmedName = editName.trim()
+    if (trimmedName && trimmedName !== projectName) {
+      updateProjectName(trimmedName)
+    }
+    setIsEditing(false)
+  }, [editName, projectName, updateProjectName])
+
+  const handleCancelEdit = useCallback(() => {
+    setEditName(projectName)
+    setIsEditing(false)
+  }, [projectName])
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter' && !isComposing) {
+        e.preventDefault()
+        handleSaveName()
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        handleCancelEdit()
+      }
+    },
+    [isComposing, handleSaveName, handleCancelEdit]
+  )
+
+  const handleBlur = useCallback(() => {
+    // Small delay to allow save button click to register
+    setTimeout(() => {
+      if (isEditing) {
+        handleSaveName()
+      }
+    }, 150)
+  }, [isEditing, handleSaveName])
 
   return (
     <header className="flex items-center justify-between border-b border-gray-200 px-4 py-2 md:py-3 relative">
@@ -33,7 +95,41 @@ export function EditorHeader({
         <Button variant="ghost" size="icon" onClick={onBack} className="flex-shrink-0">
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-base md:text-lg font-semibold text-gray-900 truncate">{projectName}</h1>
+
+        {isEditing ? (
+          <div className="flex items-center gap-1 min-w-0">
+            <Input
+              ref={inputRef}
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={handleBlur}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={() => setIsComposing(false)}
+              className="h-8 text-base md:text-lg font-semibold w-48 md:w-64"
+              maxLength={100}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleSaveName}
+              className="flex-shrink-0 h-8 w-8"
+            >
+              <Check className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <button
+            onClick={handleStartEdit}
+            className="flex items-center gap-1.5 group min-w-0 text-left"
+            title="クリックして編集"
+          >
+            <h1 className="text-base md:text-lg font-semibold text-gray-900 truncate">
+              {projectName}
+            </h1>
+            <Pencil className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+          </button>
+        )}
       </div>
 
       {/* Desktop: Action buttons */}

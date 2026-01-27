@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/context-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
+import { useProjectStore } from '@/stores/projectStore'
 import type { Slide } from '@/types/project'
 
 interface SortableSlideItemProps {
@@ -119,23 +120,13 @@ interface SlideListProps {
     slide: Slide
     imageDataUrl: string
   }>
-  selectedSlideId: string | null
-  onSlideSelect: (slideId: string) => void
   onAddBefore: (index: number) => void
   onAddAfter: (index: number) => void
-  onDelete: (slideId: string) => void
-  onReorder: (activeId: string, overId: string) => void
 }
 
-export function SlideList({
-  slides,
-  selectedSlideId,
-  onSlideSelect,
-  onAddBefore,
-  onAddAfter,
-  onDelete,
-  onReorder
-}: SlideListProps) {
+export function SlideList({ slides, onAddBefore, onAddAfter }: SlideListProps) {
+  const { selectedSlideId, setSelectedSlide, reorderSlides, deleteSlide } = useProjectStore()
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -150,8 +141,13 @@ export function SlideList({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     if (over && active.id !== over.id) {
-      onReorder(active.id as string, over.id as string)
+      reorderSlides(active.id as string, over.id as string)
     }
+  }
+
+  const handleDelete = (slideId: string) => {
+    if (slides.length <= 1) return
+    deleteSlide(slideId)
   }
 
   const canDelete = slides.length > 1
@@ -175,10 +171,10 @@ export function SlideList({
                   slide={slide}
                   imageDataUrl={imageDataUrl}
                   isSelected={slide.id === selectedSlideId}
-                  onSelect={() => onSlideSelect(slide.id)}
+                  onSelect={() => setSelectedSlide(slide.id)}
                   onAddBefore={() => onAddBefore(index)}
                   onAddAfter={() => onAddAfter(index)}
-                  onDelete={() => onDelete(slide.id)}
+                  onDelete={() => handleDelete(slide.id)}
                   canDelete={canDelete}
                 />
               ))}

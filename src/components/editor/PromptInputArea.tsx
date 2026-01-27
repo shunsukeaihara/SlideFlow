@@ -3,37 +3,37 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { SelectedReferencesPopover } from './SelectedReferencesPopover'
+import { useSlideEditorStore } from '@/stores/slideEditorStore'
 import type { ReferenceImage } from '@/types/referenceImage'
 
 interface PromptInputAreaProps {
-  prompt: string
-  onPromptChange: (value: string) => void
+  slideId: string
   onEdit: () => void
-  isEditExecuting: boolean
   isSlideProcessing: boolean
-  showReferencePanel: boolean
-  onToggleReferencePanel: () => void
-  selectedReferenceIds: Set<string>
-  onRemoveReference: (id: string) => void
-  onClearAllReferences: () => void
   onOpenDrawer: () => void
   allReferences: ReferenceImage[]
 }
 
 export function PromptInputArea({
-  prompt,
-  onPromptChange,
+  slideId,
   onEdit,
-  isEditExecuting,
   isSlideProcessing,
-  showReferencePanel,
-  onToggleReferencePanel,
-  selectedReferenceIds,
-  onRemoveReference,
-  onClearAllReferences,
   onOpenDrawer,
   allReferences
 }: PromptInputAreaProps) {
+  const {
+    processingSlides,
+    getSlideEditState,
+    setSlidePrompt,
+    removeSlideReference,
+    clearSlideReferences,
+    toggleSlideReferencePanel
+  } = useSlideEditorStore()
+
+  const editState = getSlideEditState(slideId)
+  const { prompt, selectedReferenceIds, showReferencePanel } = editState
+  const isEditExecuting = processingSlides[slideId]?.type === 'edit'
+
   const getReference = (id: string): ReferenceImage | null => {
     return allReferences.find((ref) => ref.id === id) || null
   }
@@ -42,6 +42,22 @@ export function PromptInputArea({
     .map((id) => ({ id, ref: getReference(id) }))
     .filter((item): item is { id: string; ref: ReferenceImage } => item.ref !== null)
 
+  const handlePromptChange = (value: string) => {
+    setSlidePrompt(slideId, value)
+  }
+
+  const handleRemoveReference = (id: string) => {
+    removeSlideReference(slideId, id)
+  }
+
+  const handleClearAllReferences = () => {
+    clearSlideReferences(slideId)
+  }
+
+  const handleToggleReferencePanel = () => {
+    toggleSlideReferencePanel(slideId)
+  }
+
   return (
     <div className="p-4 flex flex-col gap-2 h-full overflow-hidden">
       {/* Top row: Reference button + Selected References + History button */}
@@ -49,7 +65,7 @@ export function PromptInputArea({
         <Button
           variant="ghost"
           size="sm"
-          onClick={onToggleReferencePanel}
+          onClick={handleToggleReferencePanel}
           disabled={isEditExecuting}
           className="gap-1 text-gray-600 flex-shrink-0"
         >
@@ -71,8 +87,8 @@ export function PromptInputArea({
               <SelectedReferencesPopover
                 selectedReferenceIds={selectedReferenceIds}
                 allReferences={allReferences}
-                onRemoveReference={onRemoveReference}
-                onClearAllReferences={onClearAllReferences}
+                onRemoveReference={handleRemoveReference}
+                onClearAllReferences={handleClearAllReferences}
                 disabled={isEditExecuting}
               />
             </div>
@@ -94,7 +110,7 @@ export function PromptInputArea({
                       />
                       <button
                         className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
-                        onClick={() => onRemoveReference(id)}
+                        onClick={() => handleRemoveReference(id)}
                         disabled={isEditExecuting}
                       >
                         <X className="h-2 w-2" />
@@ -107,7 +123,7 @@ export function PromptInputArea({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={onClearAllReferences}
+                onClick={handleClearAllReferences}
                 disabled={isEditExecuting}
                 className="h-6 text-xs flex-shrink-0 px-2"
               >
@@ -134,7 +150,7 @@ export function PromptInputArea({
         {/* Textarea */}
         <Textarea
           value={prompt}
-          onChange={(e) => onPromptChange(e.target.value)}
+          onChange={(e) => handlePromptChange(e.target.value)}
           placeholder="編集の指示を入力してください（例：背景を青空に変更、テキストのフォントを大きく）"
           className="flex-1 resize-none min-h-0 md:min-h-0 min-h-[60px]"
           disabled={isEditExecuting}

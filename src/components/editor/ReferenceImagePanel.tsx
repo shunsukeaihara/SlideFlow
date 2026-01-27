@@ -4,43 +4,67 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
+import { useSlideEditorStore } from '@/stores/slideEditorStore'
 import type { ReferenceImage } from '@/types/referenceImage'
 
 interface ReferenceImagePanelProps {
+  slideId: string
   currentSlides: ReferenceImage[]
-  uploadedImages: ReferenceImage[]
   historyImages: ReferenceImage[]
-  selectedReferenceIds: Set<string>
-  onToggleReference: (id: string) => void
-  onRemoveUploadedImage: (id: string) => void
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
-  isEditExecuting: boolean
 }
 
 export function ReferenceImagePanel({
+  slideId,
   currentSlides,
-  uploadedImages,
   historyImages,
-  selectedReferenceIds,
-  onToggleReference,
-  onRemoveUploadedImage,
-  onFileUpload,
-  isEditExecuting
+  onFileUpload
 }: ReferenceImagePanelProps) {
+  const {
+    processingSlides,
+    getSlideEditState,
+    toggleSlideReference,
+    removeSlideUploadedImage
+  } = useSlideEditorStore()
+
+  const editState = getSlideEditState(slideId)
+  const { selectedReferenceIds, uploadedImages } = editState
+  const isEditExecuting = processingSlides[slideId]?.type === 'edit'
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [referenceTab, setReferenceTab] = useState<'current' | 'uploaded' | 'history'>('current')
+
+  // Convert uploadedImages to ReferenceImage format
+  const uploadedReferenceImages: ReferenceImage[] = uploadedImages.map((img) => ({
+    id: img.id,
+    name: img.name,
+    dataUrl: img.dataUrl,
+    width: img.width,
+    height: img.height,
+    isSlide: false
+  }))
 
   const getDisplayImages = (): ReferenceImage[] => {
     if (referenceTab === 'current') {
       return currentSlides
     } else if (referenceTab === 'uploaded') {
-      return uploadedImages
+      return uploadedReferenceImages
     } else {
       return historyImages
     }
   }
 
   const displayImages = getDisplayImages()
+
+  const handleToggleReference = (id: string) => {
+    if (!isEditExecuting) {
+      toggleSlideReference(slideId, id)
+    }
+  }
+
+  const handleRemoveUploadedImage = (id: string) => {
+    removeSlideUploadedImage(slideId, id)
+  }
 
   return (
     <div className="border-b border-gray-200 p-3">
@@ -106,7 +130,7 @@ export function ReferenceImagePanel({
                     ? 'border-blue-500'
                     : 'border-gray-200 hover:border-gray-300'
                 )}
-                onClick={() => !isEditExecuting && onToggleReference(ref.id)}
+                onClick={() => handleToggleReference(ref.id)}
               >
                 <img
                   src={ref.dataUrl}
@@ -118,7 +142,7 @@ export function ReferenceImagePanel({
                     className="absolute top-1 right-1 p-0.5 bg-white rounded-full hover:bg-gray-100"
                     onClick={(e) => {
                       e.stopPropagation()
-                      onRemoveUploadedImage(ref.id)
+                      handleRemoveUploadedImage(ref.id)
                     }}
                   >
                     <X className="h-3 w-3" />

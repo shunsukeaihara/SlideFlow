@@ -45,11 +45,8 @@ export function EditorPage() {
     project,
     selectedSlideId,
     appSettings,
-    setSelectedSlide,
     addEditHistory,
     revertToHistory,
-    reorderSlides,
-    deleteSlide,
     clearSlideOcrResult,
     setSlideOcrResult
   } = useProjectStore()
@@ -61,14 +58,8 @@ export function EditorPage() {
     startSlideProcessing,
     updateSlideProcessingStatus,
     endSlideProcessing,
-    setSlidePrompt,
-    toggleSlideReference,
-    removeSlideReference,
-    clearSlideReferences,
     addSlideUploadedImage,
-    removeSlideUploadedImage,
-    clearSlideEditState,
-    toggleSlideReferencePanel
+    clearSlideEditState
   } = useSlideEditorStore()
 
   // Get current slide's edit state
@@ -83,20 +74,18 @@ export function EditorPage() {
 
   // Get current slide's processing state
   const processingState = selectedSlideId ? processingSlides[selectedSlideId] : undefined
-  const isEditExecuting = processingState?.type === 'edit'
   const isSlideProcessing = !!processingState
 
   // Custom hooks for image operations
   const { getCurrentImageData, getOriginalImageData } = useImageOperations(project)
 
   // Build reference images
-  const { currentSlideReferences, pastReferenceImages, historyImages, allReferences } =
-    useReferenceImages({
-      project,
-      selectedSlideId,
-      uploadedImages,
-      getCurrentImageData
-    })
+  const { currentSlideReferences, historyImages, allReferences } = useReferenceImages({
+    project,
+    selectedSlideId,
+    uploadedImages,
+    getCurrentImageData
+  })
 
   useEffect(() => {
     if (!project) {
@@ -139,17 +128,6 @@ export function EditorPage() {
     setAddSlideDialogOpen(true)
   }, [])
 
-  const handleDeleteSlide = useCallback(
-    (slideId: string) => {
-      if (project && project.slides.length > 1) {
-        if (confirm('このスライドを削除しますか?編集履歴も削除されます。')) {
-          deleteSlide(slideId)
-        }
-      }
-    },
-    [project, deleteSlide]
-  )
-
   // Resize handlers for input area
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -180,43 +158,6 @@ export function EditorPage() {
       }
     }
   }, [isResizing, handleResizeMove, handleResizeEnd])
-
-  // Prompt change handler
-  const handlePromptChange = useCallback(
-    (value: string) => {
-      if (selectedSlideId) {
-        setSlidePrompt(selectedSlideId, value)
-      }
-    },
-    [selectedSlideId, setSlidePrompt]
-  )
-
-  // Reference toggle handler
-  const handleToggleReference = useCallback(
-    (refId: string) => {
-      if (selectedSlideId) {
-        toggleSlideReference(selectedSlideId, refId)
-      }
-    },
-    [selectedSlideId, toggleSlideReference]
-  )
-
-  // Reference remove handler
-  const handleRemoveReference = useCallback(
-    (refId: string) => {
-      if (selectedSlideId) {
-        removeSlideReference(selectedSlideId, refId)
-      }
-    },
-    [selectedSlideId, removeSlideReference]
-  )
-
-  // Clear all references handler
-  const handleClearAllReferences = useCallback(() => {
-    if (selectedSlideId) {
-      clearSlideReferences(selectedSlideId)
-    }
-  }, [selectedSlideId, clearSlideReferences])
 
   // File upload handler
   const handleFileUpload = useCallback(
@@ -250,16 +191,6 @@ export function EditorPage() {
       })
     },
     [selectedSlideId, addSlideUploadedImage]
-  )
-
-  // Remove uploaded image handler
-  const handleRemoveUploadedImage = useCallback(
-    (imageId: string) => {
-      if (selectedSlideId) {
-        removeSlideUploadedImage(selectedSlideId, imageId)
-      }
-    },
-    [selectedSlideId, removeSlideUploadedImage]
   )
 
   const handleEdit = useCallback(async () => {
@@ -445,7 +376,6 @@ export function EditorPage() {
     <div className="flex h-full flex-col">
       {/* Header */}
       <EditorHeader
-        projectName={project.name}
         isSaving={isSaving}
         onBack={handleBack}
         onSave={handleSaveProject}
@@ -469,12 +399,8 @@ export function EditorPage() {
         <div className="hidden md:block h-full">
           <SlideList
             slides={slidesForList}
-            selectedSlideId={selectedSlideId}
-            onSlideSelect={setSelectedSlide}
             onAddBefore={handleAddSlideBefore}
             onAddAfter={handleAddSlideAfter}
-            onDelete={handleDeleteSlide}
-            onReorder={reorderSlides}
           />
         </div>
 
@@ -484,15 +410,8 @@ export function EditorPage() {
             <div className="flex-1 min-h-0 h-full">
               <SlideList
                 slides={slidesForList}
-                selectedSlideId={selectedSlideId}
-                onSlideSelect={(slideId) => {
-                  setSelectedSlide(slideId)
-                  setIsSlideListOpen(false)
-                }}
                 onAddBefore={handleAddSlideBefore}
                 onAddAfter={handleAddSlideAfter}
-                onDelete={handleDeleteSlide}
-                onReorder={reorderSlides}
               />
             </div>
           </SheetContent>
@@ -516,14 +435,10 @@ export function EditorPage() {
             {showReferencePanel && (
               <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg">
                 <ReferenceImagePanel
+                  slideId={selectedSlide.id}
                   currentSlides={currentSlideReferences}
-                  uploadedImages={[...pastReferenceImages, ...uploadedImages]}
                   historyImages={historyImages}
-                  selectedReferenceIds={selectedReferenceIds}
-                  onToggleReference={handleToggleReference}
-                  onRemoveUploadedImage={handleRemoveUploadedImage}
                   onFileUpload={handleFileUpload}
-                  isEditExecuting={isEditExecuting}
                 />
               </div>
             )}
@@ -541,16 +456,9 @@ export function EditorPage() {
           <div className="border-t border-gray-200 bg-white flex flex-col overflow-hidden" style={{ height: `${inputAreaHeight}px` }}>
 
             <PromptInputArea
-              prompt={prompt}
-              onPromptChange={handlePromptChange}
+              slideId={selectedSlide.id}
               onEdit={handleEdit}
-              isEditExecuting={isEditExecuting}
               isSlideProcessing={isSlideProcessing}
-              showReferencePanel={showReferencePanel}
-              onToggleReferencePanel={() => selectedSlideId && toggleSlideReferencePanel(selectedSlideId)}
-              selectedReferenceIds={selectedReferenceIds}
-              onRemoveReference={handleRemoveReference}
-              onClearAllReferences={handleClearAllReferences}
               onOpenDrawer={() => setIsDrawerOpen(true)}
               allReferences={allReferences}
             />

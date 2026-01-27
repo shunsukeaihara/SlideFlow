@@ -71,6 +71,9 @@ interface ProjectState {
   // OCR actions
   setSlideOcrResult: (slideId: string, ocrResult: OcrResult) => void
   clearSlideOcrResult: (slideId: string) => void
+
+  // Project name
+  updateProjectName: (name: string) => void
 }
 
 const defaultAppSettings: AppSettings = {
@@ -514,6 +517,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             ocrCache: undefined
           }
         }
+      }
+    })
+  },
+
+  updateProjectName: (name) => {
+    const { project } = get()
+    if (!project) return
+
+    set({
+      project: {
+        ...project,
+        name,
+        updatedAt: Date.now()
       }
     })
   }
