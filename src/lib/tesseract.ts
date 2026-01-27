@@ -1,16 +1,15 @@
 import { createWorker, type Worker, PSM } from 'tesseract.js'
 import type { OcrTextBlock } from '../types/project'
-import { logger } from './logger'
 
 export async function extractTextWithTesseract(dataUrl: string): Promise<OcrTextBlock[]> {
   let worker: Worker | null = null
 
   try {
     // Create Tesseract worker with Japanese and English language support
-    logger.log('[Tesseract] Creating worker...')
+    console.log('[Tesseract] Creating worker...')
     worker = await createWorker('jpn+eng', undefined, {
       logger: (m) => {
-        logger.debug('[Tesseract]', m)
+        console.debug('[Tesseract]', m)
       }
     })
 
@@ -21,7 +20,7 @@ export async function extractTextWithTesseract(dataUrl: string): Promise<OcrText
     })
 
     // Perform OCR with blocks enabled to get bounding boxes
-    logger.log('[Tesseract] Starting recognition...')
+    console.log('[Tesseract] Starting recognition...')
     const result = await worker.recognize(
       dataUrl,
       {
@@ -30,7 +29,7 @@ export async function extractTextWithTesseract(dataUrl: string): Promise<OcrText
       { blocks: true } // This is crucial for getting bounding boxes
     )
 
-    logger.debug('[Tesseract] Recognition result:', result)
+    console.debug('[Tesseract] Recognition result:', result)
 
     // Extract paragraphs with bounding boxes from blocks structure
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,7 +37,7 @@ export async function extractTextWithTesseract(dataUrl: string): Promise<OcrText
     const textBlocks: OcrTextBlock[] = []
 
     if (data.blocks && Array.isArray(data.blocks)) {
-      logger.log('[Tesseract] Found', data.blocks.length, 'blocks')
+      console.log('[Tesseract] Found', data.blocks.length, 'blocks')
 
       for (const block of data.blocks) {
         if (!block.paragraphs) continue
@@ -120,7 +119,7 @@ export async function extractTextWithTesseract(dataUrl: string): Promise<OcrText
         }
       }
 
-      logger.log('[Tesseract] Extracted', textBlocks.length, 'paragraphs from blocks')
+      console.log('[Tesseract] Extracted', textBlocks.length, 'paragraphs from blocks')
     }
 
     if (textBlocks.length === 0) {
@@ -128,7 +127,7 @@ export async function extractTextWithTesseract(dataUrl: string): Promise<OcrText
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = result.data as any
       if (data.text && data.text.trim()) {
-        logger.log('[Tesseract] Fallback: creating single text block')
+        console.log('[Tesseract] Fallback: creating single text block')
         textBlocks.push({
           text: data.text.trim(),
           bbox: {
@@ -144,11 +143,11 @@ export async function extractTextWithTesseract(dataUrl: string): Promise<OcrText
       }
     }
 
-    logger.log('[Tesseract] Extracted', textBlocks.length, 'text blocks')
+    console.log('[Tesseract] Extracted', textBlocks.length, 'text blocks')
 
     return textBlocks
   } catch (error) {
-    logger.error('Tesseract OCR error:', error)
+    console.error('Tesseract OCR error:', error)
     throw new Error(
       `Tesseract OCR failed: ${error instanceof Error ? error.message : 'Unknown error'}`
     )

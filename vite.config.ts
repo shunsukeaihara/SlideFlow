@@ -8,7 +8,12 @@ export default defineConfig({
   publicDir: '../public',
   build: {
     outDir: '../dist',
-    emptyOutDir: true
+    emptyOutDir: true,
+    minify: 'esbuild'
+  },
+  esbuild: {
+    // Remove console.log and console.warn in production builds
+    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : []
   },
   resolve: {
     alias: {

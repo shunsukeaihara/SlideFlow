@@ -11,7 +11,17 @@ const nextConfig: NextConfig = {
   transpilePackages: [],
 
   // Exclude pdfjs-dist from server-side bundling (Turbopack equivalent)
-  serverExternalPackages: ['pdfjs-dist']
+  serverExternalPackages: ['pdfjs-dist'],
+
+  // Remove console.log/warn in production builds
+  compiler: {
+    removeConsole:
+      process.env.NODE_ENV === 'production'
+        ? {
+            exclude: ['error'] // Keep console.error for critical errors
+          }
+        : false
+  }
 }
 
 export default nextConfig
