@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { GripHorizontal } from 'lucide-react'
+import { GripHorizontal, PanelLeftOpen } from 'lucide-react'
 import { AddSlideDialog } from '@/components/AddSlideDialog'
 import { EditorHeader } from '@/components/editor/EditorHeader'
 import { SlideList } from '@/components/editor/SlideList'
@@ -8,6 +8,8 @@ import { SlidePreview } from '@/components/editor/SlidePreview'
 import { PromptInputArea } from '@/components/editor/PromptInputArea'
 import { ReferenceImagePanel } from '@/components/editor/ReferenceImagePanel'
 import { EditHistoryDrawer } from '@/components/editor/EditHistoryDrawer'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { Button } from '@/components/ui/button'
 import { useProjectStore } from '@/stores/projectStore'
 import { useSlideEditorStore, type UploadedImage } from '@/stores/slideEditorStore'
 import { useImageOperations } from '@/hooks/useImageOperations'
@@ -27,7 +29,8 @@ export function EditorPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [addSlideDialogOpen, setAddSlideDialogOpen] = useState(false)
   const [addSlideInsertIndex, setAddSlideInsertIndex] = useState(0)
-    const [showOcrOverlay, setShowOcrOverlay] = useState(true)
+  const [showOcrOverlay, setShowOcrOverlay] = useState(true)
+  const [isSlideListOpen, setIsSlideListOpen] = useState(false)
 
   // Resize state for input area
   const [inputAreaHeight, setInputAreaHeight] = useState(200)
@@ -106,6 +109,18 @@ export function EditorPage() {
       initializeGemini(appSettings.apiKey)
     }
   }, [appSettings.apiKey])
+
+  // Close slide list sheet when screen becomes wide (md breakpoint = 768px)
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 768px)')
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        setIsSlideListOpen(false)
+      }
+    }
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
 
   const selectedSlide = project?.slides.find((s) => s.id === selectedSlideId)
   const selectedSlideImageData = getCurrentImageData(selectedSlide)
@@ -435,17 +450,49 @@ export function EditorPage() {
       />
 
       {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar - Slide Thumbnails */}
-        <SlideList
-          slides={slidesForList}
-          selectedSlideId={selectedSlideId}
-          onSlideSelect={setSelectedSlide}
-          onAddBefore={handleAddSlideBefore}
-          onAddAfter={handleAddSlideAfter}
-          onDelete={handleDeleteSlide}
-          onReorder={reorderSlides}
-        />
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Slide List Toggle Button - visible on narrow screens */}
+        <Button
+          variant="outline"
+          size="icon"
+          className="absolute left-2 top-2 z-10 md:hidden"
+          onClick={() => setIsSlideListOpen(true)}
+        >
+          <PanelLeftOpen className="h-4 w-4" />
+        </Button>
+
+        {/* Left Sidebar - Slide Thumbnails (hidden on narrow screens) */}
+        <div className="hidden md:block h-full">
+          <SlideList
+            slides={slidesForList}
+            selectedSlideId={selectedSlideId}
+            onSlideSelect={setSelectedSlide}
+            onAddBefore={handleAddSlideBefore}
+            onAddAfter={handleAddSlideAfter}
+            onDelete={handleDeleteSlide}
+            onReorder={reorderSlides}
+          />
+        </div>
+
+        {/* Slide List Sheet - overlay on narrow screens */}
+        <Sheet open={isSlideListOpen} onOpenChange={setIsSlideListOpen}>
+          <SheetContent side="left" className="w-48 p-0 pt-6 h-full flex flex-col">
+            <div className="flex-1 min-h-0 h-full">
+              <SlideList
+                slides={slidesForList}
+                selectedSlideId={selectedSlideId}
+                onSlideSelect={(slideId) => {
+                  setSelectedSlide(slideId)
+                  setIsSlideListOpen(false)
+                }}
+                onAddBefore={handleAddSlideBefore}
+                onAddAfter={handleAddSlideAfter}
+                onDelete={handleDeleteSlide}
+                onReorder={reorderSlides}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* Center - Main Editor */}
         <main className="flex flex-1 flex-col overflow-hidden">

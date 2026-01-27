@@ -22,7 +22,13 @@ export function SlideToolbar({
   isProcessing,
   containerRef
 }: SlideToolbarProps) {
-  const [position, setPosition] = useState({ x: 0, y: 0 }) // 左上隅（初期位置）
+  // Initial position accounts for narrow screens where slide list toggle button exists
+  // Button is at left-2 top-2 (8px) with size ~40x40px, so we add spacing
+  const getInitialPosition = () => {
+    const isNarrowScreen = typeof window !== 'undefined' && window.innerWidth < 768
+    return isNarrowScreen ? { x: 56, y: 8 } : { x: 0, y: 0 }
+  }
+  const [position, setPosition] = useState(getInitialPosition)
   const [isDragging, setIsDragging] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
@@ -45,6 +51,7 @@ export function SlideToolbar({
   }
 
   // Constrain position to container bounds
+  // On narrow screens, if position overlaps with slide list toggle button, adjust it
   const constrainPosition = useCallback(() => {
     if (toolbarRef.current && containerRef.current) {
       const containerRect = containerRef.current.getBoundingClientRect()
@@ -53,10 +60,21 @@ export function SlideToolbar({
       const maxX = containerRect.width - toolbarRect.width
       const maxY = containerRect.height - toolbarRect.height
 
-      setPosition((prev) => ({
-        x: Math.max(0, Math.min(prev.x, maxX)),
-        y: Math.max(0, Math.min(prev.y, maxY))
-      }))
+      // On narrow screens, check if position overlaps with toggle button area
+      const isNarrowScreen = window.innerWidth < 768
+      const minX = isNarrowScreen ? 56 : 0
+      const minY = isNarrowScreen ? 8 : 0
+
+      setPosition((prev) => {
+        // Only apply minimum constraint if current position would overlap
+        const needsAdjustX = isNarrowScreen && prev.x < minX
+        const needsAdjustY = isNarrowScreen && prev.y < minY
+
+        return {
+          x: Math.max(needsAdjustX ? minX : 0, Math.min(prev.x, maxX)),
+          y: Math.max(needsAdjustY ? minY : 0, Math.min(prev.y, maxY))
+        }
+      })
     }
   }, [containerRef])
 
@@ -71,7 +89,7 @@ export function SlideToolbar({
         let newX = e.clientX - dragOffset.x - containerRect.left
         let newY = e.clientY - dragOffset.y - containerRect.top
 
-        // Constrain to container bounds
+        // Constrain to container bounds (only max, allow moving to 0,0)
         const maxX = containerRect.width - toolbarRect.width
         const maxY = containerRect.height - toolbarRect.height
 
