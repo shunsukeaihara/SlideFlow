@@ -157,7 +157,7 @@ export function SlideList({
   const canDelete = slides.length > 1
 
   return (
-    <aside className="w-48 border-r border-gray-200 bg-gray-50">
+    <aside className="w-48 h-full border-r border-gray-200 bg-gray-50">
       <ScrollArea className="h-full">
         <div className="space-y-2 p-3">
           <DndContext
