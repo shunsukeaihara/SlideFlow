@@ -1,6 +1,6 @@
 import type { OcrResult } from '../types/project'
-import { extractTextWithTesseract } from './ocr-tesseract'
-import { refineTesseractResults } from './ocr-gemini'
+import { extractTextWithTesseract } from './tesseract'
+import { refineTesseractResults } from './gemini'
 
 export interface OcrOptions {
   onProgress?: (status: string) => void
