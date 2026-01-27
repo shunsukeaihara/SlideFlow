@@ -1,8 +1,9 @@
-import { useRef } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useRef, useState, useCallback } from 'react'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { OcrOverlay } from '@/components/OcrOverlay'
 import { SlideToolbar } from '@/components/SlideToolbar'
+import { SlideOverlay } from '@/components/editor/SlideOverlay'
+import { useProcessingStore } from '@/stores/processingStore'
 import type { Image } from '@/types/project'
 
 interface SlidePreviewProps {
@@ -13,8 +14,6 @@ interface SlidePreviewProps {
   onToggleOcrOverlay: () => void
   onExecuteOcr: () => void
   onClearOcr: () => void
-  isOcrProcessing: boolean
-  ocrStatus: string
 }
 
 export function SlidePreview({
@@ -24,12 +23,19 @@ export function SlidePreview({
   showOcrOverlay,
   onToggleOcrOverlay,
   onExecuteOcr,
-  onClearOcr,
-  isOcrProcessing,
-  ocrStatus
+  onClearOcr
 }: SlidePreviewProps) {
-  const imageRef = useRef<HTMLImageElement>(null)
+  // Use state instead of ref to track image element for OcrOverlay
+  const [imageElement, setImageElement] = useState<HTMLImageElement | null>(null)
   const imageContainerRef = useRef<HTMLDivElement>(null)
+
+  const handleImageRef = useCallback((element: HTMLImageElement | null) => {
+    setImageElement(element)
+  }, [])
+
+  // processingStoreから処理状態を取得
+  const processingState = useProcessingStore((state) => state.processingSlides[slideId])
+  const isSlideProcessing = !!processingState
 
   return (
     <div
@@ -46,7 +52,7 @@ export function SlidePreview({
           onExecuteOcr={onExecuteOcr}
           onToggleVisibility={onToggleOcrOverlay}
           onClearOcr={onClearOcr}
-          isProcessing={isOcrProcessing}
+          isProcessing={isSlideProcessing}
           containerRef={imageContainerRef}
         />
       )}
@@ -68,7 +74,7 @@ export function SlidePreview({
               {imageData && (
                 <>
                   <img
-                    ref={imageRef}
+                    ref={handleImageRef}
                     src={imageData.dataUrl}
                     alt={`Slide ${slideNumber}`}
                     className="rounded-lg shadow-lg"
@@ -81,20 +87,10 @@ export function SlidePreview({
                       objectFit: 'contain'
                     }}
                   />
-                  {imageData.ocrCache && imageRef.current && showOcrOverlay && (
-                    <OcrOverlay ocrResult={imageData.ocrCache} imageElement={imageRef.current} />
+                  {imageData.ocrCache && imageElement && showOcrOverlay && (
+                    <OcrOverlay ocrResult={imageData.ocrCache} imageElement={imageElement} />
                   )}
                 </>
-              )}
-              {isOcrProcessing && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
-                  <div className="bg-white rounded-lg p-6 shadow-xl max-w-sm w-full mx-4">
-                    <div className="flex items-center gap-3">
-                      <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                      <span className="text-lg font-medium">{ocrStatus}</span>
-                    </div>
-                  </div>
-                </div>
               )}
             </div>
           </ContextMenuTrigger>
@@ -103,6 +99,9 @@ export function SlidePreview({
           </ContextMenuContent>
         </ContextMenu>
       </div>
+
+      {/* Processing Overlay - covers entire SlidePreview */}
+      {processingState && <SlideOverlay status={processingState.status} />}
     </div>
   )
 }

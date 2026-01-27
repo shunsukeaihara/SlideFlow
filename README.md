@@ -74,9 +74,10 @@ The OCR toolbar is a draggable, minimizable floating panel that stays within the
 Projects are saved as `.sfpj` files (ZIP archives) with optimized binary storage:
 
 - **Images**: Stored as WebP files (90% quality) for optimal size/quality balance
-- **Metadata**: JSON with image references and edit history
-- **File Size**: ~95% smaller than initial Base64 approach (e.g., 10MB PDF → 3-4MB project file)
-- **Backward Compatible**: Supports loading legacy format projects
+- **Metadata**: JSON containing:
+  - Edit history for each slide (prompts, reference images, source/result image references)
+  - OCR results cached per image (text blocks with bounding boxes)
+  - Project settings and slide ordering
 
 ## Technology Stack
 

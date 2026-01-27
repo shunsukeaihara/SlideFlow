@@ -14,7 +14,7 @@ interface ReferenceImagePanelProps {
   onToggleReference: (id: string) => void
   onRemoveUploadedImage: (id: string) => void
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
-  isEditing: boolean
+  isEditExecuting: boolean
 }
 
 export function ReferenceImagePanel({
@@ -25,7 +25,7 @@ export function ReferenceImagePanel({
   onToggleReference,
   onRemoveUploadedImage,
   onFileUpload,
-  isEditing
+  isEditExecuting
 }: ReferenceImagePanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [referenceTab, setReferenceTab] = useState<'current' | 'uploaded' | 'history'>('current')
@@ -50,7 +50,7 @@ export function ReferenceImagePanel({
           variant="outline"
           size="sm"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isEditing}
+          disabled={isEditExecuting}
         >
           <Upload className="mr-2 h-4 w-4" />
           画像を追加
@@ -100,12 +100,15 @@ export function ReferenceImagePanel({
               <div
                 key={ref.id}
                 className={cn(
-                  'relative flex-shrink-0 w-24 rounded-lg border-2 overflow-hidden cursor-pointer transition-all',
+                  'relative flex-shrink-0 w-24 rounded-lg border-2 overflow-hidden transition-all',
+                  isEditExecuting
+                    ? 'cursor-not-allowed opacity-50'
+                    : 'cursor-pointer',
                   selectedReferenceIds.has(ref.id)
                     ? 'border-blue-500'
                     : 'border-gray-200 hover:border-gray-300'
                 )}
-                onClick={() => onToggleReference(ref.id)}
+                onClick={() => !isEditExecuting && onToggleReference(ref.id)}
               >
                 <img
                   src={ref.dataUrl}
