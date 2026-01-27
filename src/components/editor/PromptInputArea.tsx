@@ -151,43 +151,44 @@ export function PromptInputArea({
         </Button>
       </div>
 
-      {/* Main input area - responsive layout */}
-      <div className="flex flex-col md:flex-row gap-3 flex-1 min-h-0">
+      {/* Main input area */}
+      <div className="flex flex-col gap-2 flex-1 min-h-0">
         {/* Textarea */}
         <Textarea
           value={prompt}
           onChange={(e) => handlePromptChange(e.target.value)}
           placeholder="編集の指示を入力してください（例：背景を青空に変更、テキストのフォントを大きく）"
-          className="flex-1 resize-none min-h-0 md:min-h-0 min-h-[60px]"
+          className="flex-1 resize-none min-h-[60px]"
           disabled={isEditExecuting}
         />
 
-        {/* Edit button area */}
-        <div className="flex flex-col justify-end gap-2 flex-shrink-0">
-          {/* OCR checkbox */}
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        {/* Bottom row: OCR checkbox (left) + Edit button (right) */}
+        <div className="flex items-center justify-between flex-shrink-0">
+          <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer min-w-0 flex-1 mr-2">
             <Checkbox
               checked={includeOcrResult}
               onCheckedChange={(checked) => handleIncludeOcrChange(checked === true)}
               disabled={isEditExecuting || isSlideProcessing}
+              className="flex-shrink-0"
             />
-            <span>OCR結果を含める</span>
+            <span className="truncate">OCR結果をプロンプトに含める</span>
           </label>
 
-          {/* Edit button */}
           <Button
             onClick={onEdit}
             disabled={isSlideProcessing || !prompt.trim()}
-            className="w-full md:w-auto md:min-w-[100px]"
+            variant="outline"
+            size="sm"
+            className="gap-1"
           >
             {isEditExecuting ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 編集中...
               </>
             ) : (
               <>
-                <Wand2 className="mr-2 h-4 w-4" />
+                <Wand2 className="h-4 w-4" />
                 編集
               </>
             )}

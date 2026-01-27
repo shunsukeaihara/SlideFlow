@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@plugin 'tailwindcss-animate';
 
 :root {
   --background: 0 0% 100%;
@@ -65,3 +66,4 @@ body {
   height: 100vh;
   width: 100vw;
 }
+
