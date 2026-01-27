@@ -256,7 +256,7 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
                   }
 
                   return (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {displayImages.map((ref) => (
                         <div
                           key={ref.id}

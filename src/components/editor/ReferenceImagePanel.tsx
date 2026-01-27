@@ -95,7 +95,7 @@ export function ReferenceImagePanel({
                 : '他のスライドがありません'}
           </div>
         ) : (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {displayImages.map((ref) => (
               <div
                 key={ref.id}
