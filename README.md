@@ -12,13 +12,17 @@ AI-powered editor for NotebookLM-generated slide PDFs using Google's Gemini.
 - Export edited slides as PDF
 - Drag and drop slide reordering
 - Reference images for consistent AI editing across slides
-- Runs entirely in your browser - your data is only sent to Gemini API, never to any other server
 
-## Recommended IDE Setup
+## Deployment Modes
 
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
+SlideFlow supports two deployment modes from a single codebase:
 
-## Project Setup
+| Mode               | Description                                        | API Key Management                              |
+| ------------------ | -------------------------------------------------- | ----------------------------------------------- |
+| **Vite SPA**       | Static deployment (Vercel, Netlify, GitHub Pages)  | User provides their own API key (localStorage)  |
+| **Next.js Server** | Server-side deployment with Docker                 | Server manages API key (environment variable)   |
+
+## Quick Start
 
 ### Prerequisites
 
@@ -34,25 +38,75 @@ yarn install
 
 ### Development
 
+**Vite SPA Mode** (client-side API calls):
+
 ```bash
 yarn dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
+**Next.js Server Mode** (server-side API calls):
+
+```bash
+# Set API key in environment
+export GEMINI_API_KEY=your-api-key
+
+yarn dev:next
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
 ### Build
+
+**Vite SPA:**
 
 ```bash
 yarn build
 ```
 
-The built files will be in the `dist` directory, ready for deployment to any static hosting service (Vercel, Netlify, GitHub Pages, etc.).
+The built files will be in the `dist` directory, ready for deployment to any static hosting service.
 
-### Preview Production Build
+**Next.js Server:**
 
 ```bash
-yarn preview
+yarn build:next
+yarn start
 ```
+
+## Docker Deployment (Next.js Server Mode)
+
+```bash
+# Build Docker image
+docker build -t slideflow-next -f next/Dockerfile .
+
+# Run with API key
+docker run -p 3000:3000 -e GEMINI_API_KEY=your-key slideflow-next
+```
+
+**Docker Hub:**
+
+```bash
+docker pull aihara/slideflow-next:v1.0.0
+docker run -p 3000:3000 -e GEMINI_API_KEY=your-key aihara/slideflow-next:v1.0.0
+```
+
+**Docker Compose example:**
+
+```yaml
+services:
+  slideflow:
+    image: aihara/slideflow-next:v1.0.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    restart: unless-stopped
+```
+
+## Recommended IDE Setup
+
+- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
 
 ## How It Works
 
@@ -83,7 +137,7 @@ Projects are saved as `.sfpj` files (ZIP archives) with optimized binary storage
 
 - React 19
 - TypeScript
-- Vite
+- Vite / Next.js 16
 - Tailwind CSS
 - Zustand (State Management)
 - Google Gemini AI (vision & generation + OCR refinement)
@@ -94,17 +148,9 @@ Projects are saved as `.sfpj` files (ZIP archives) with optimized binary storage
 
 ## Security Note
 
-This application runs entirely in the browser. Your Google AI API key is stored in your browser's localStorage and all API calls are made directly from the client side.
+**Vite SPA Mode**: Your Google AI API key is stored in your browser's localStorage and all API calls are made directly from the client side. Each user must obtain and configure their own API key.
 
-**Personal Use Tool**: SlideFlow is designed as a personal productivity tool for users who have their own Google AI API key. Each user must obtain and configure their own API key to use the application.
-
-**For SaaS Deployment**: If you want to deploy this as a service for users without API keys, you should implement a backend server that:
-
-- Manages API keys server-side
-- Handles Gemini API calls through a proxy
-- Implements user authentication and authorization
-- Adds rate limiting and usage monitoring
-- Provides billing/subscription management
+**Next.js Server Mode**: The API key is stored server-side as an environment variable. Clients never see the API key, making this mode suitable for shared deployments with authentication.
 
 ## License
 
