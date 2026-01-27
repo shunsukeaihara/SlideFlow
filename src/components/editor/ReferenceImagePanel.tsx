@@ -76,7 +76,7 @@ export function ReferenceImagePanel({
             現在のスライド
           </TabsTrigger>
           <TabsTrigger value="uploaded" className="text-xs !text-ellipsis">
-            過去アップロードした画像
+            アップロード画像
           </TabsTrigger>
           <TabsTrigger value="history" className="text-xs !text-ellipsis">
             履歴のスライド

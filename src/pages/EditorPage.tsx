@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Download, Save, Settings, Loader2, GripHorizontal } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { GripHorizontal } from 'lucide-react'
 import { AddSlideDialog } from '@/components/AddSlideDialog'
+import { EditorHeader } from '@/components/editor/EditorHeader'
 import { SlideList } from '@/components/editor/SlideList'
 import { SlidePreview } from '@/components/editor/SlidePreview'
 import { PromptInputArea } from '@/components/editor/PromptInputArea'
@@ -425,36 +425,14 @@ export function EditorPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={handleBack}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold text-gray-900">{project.name}</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleSaveProject} disabled={isSaving}>
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                保存中...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                保存
-              </>
-            )}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportPdf}>
-            <Download className="mr-2 h-4 w-4" />
-            PDF出力
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
-            <Settings className="h-5 w-5" />
-          </Button>
-        </div>
-      </header>
+      <EditorHeader
+        projectName={project.name}
+        isSaving={isSaving}
+        onBack={handleBack}
+        onSave={handleSaveProject}
+        onExportPdf={handleExportPdf}
+        onOpenSettings={() => navigate('/settings')}
+      />
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
