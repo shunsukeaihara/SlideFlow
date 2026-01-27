@@ -7,7 +7,7 @@ import { SlideList } from '@/components/editor/SlideList'
 import { SlidePreview } from '@/components/editor/SlidePreview'
 import { PromptInputArea } from '@/components/editor/PromptInputArea'
 import { ReferenceImagePanel } from '@/components/editor/ReferenceImagePanel'
-import { EditHistoryDrawer } from '@/components/editor/EditHistoryDrawer'
+import { SlideInfoDrawer } from '@/components/editor/SlideInfoDrawer'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { useProjectStore } from '@/stores/projectStore'
@@ -83,12 +83,13 @@ export function EditorPage() {
   const { getCurrentImageData, getOriginalImageData } = useImageOperations(project)
 
   // Build reference images
-  const { currentSlideReferences, historyImages, allReferences } = useReferenceImages({
-    project,
-    selectedSlideId,
-    uploadedImages,
-    getCurrentImageData
-  })
+  const { currentSlideReferences, historyImages, pastReferenceImages, allReferences } =
+    useReferenceImages({
+      project,
+      selectedSlideId,
+      uploadedImages,
+      getCurrentImageData
+    })
 
   useEffect(() => {
     if (!project) {
@@ -281,7 +282,8 @@ export function EditorPage() {
         currentImageData.dataUrl,
         fullPrompt,
         project?.settings.basePrompt,
-        referenceImageDataUrls
+        referenceImageDataUrls,
+        { width: currentImageData.width, height: currentImageData.height }
       )
 
       // Convert reference IDs to image data
@@ -507,6 +509,7 @@ export function EditorPage() {
                   slideId={selectedSlide.id}
                   currentSlides={currentSlideReferences}
                   historyImages={historyImages}
+                  pastReferenceImages={pastReferenceImages}
                   onFileUpload={handleFileUpload}
                 />
               </div>
@@ -538,7 +541,7 @@ export function EditorPage() {
       </div>
 
       {/* Right Drawer */}
-      <EditHistoryDrawer
+      <SlideInfoDrawer
         open={isDrawerOpen}
         onOpenChange={setIsDrawerOpen}
         slide={selectedSlide}
@@ -546,6 +549,7 @@ export function EditorPage() {
         onRevertToHistory={handleRevertToHistory}
         onRevertToOriginal={handleRevertToOriginal}
         getOriginalImageData={getOriginalImageData}
+        getCurrentImageData={getCurrentImageData}
       />
 
       {/* Add Slide Dialog */}

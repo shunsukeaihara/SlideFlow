@@ -11,6 +11,7 @@ interface ReferenceImagePanelProps {
   slideId: string
   currentSlides: ReferenceImage[]
   historyImages: ReferenceImage[]
+  pastReferenceImages: ReferenceImage[]
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
 }
 
@@ -18,13 +19,15 @@ export function ReferenceImagePanel({
   slideId,
   currentSlides,
   historyImages,
+  pastReferenceImages,
   onFileUpload
 }: ReferenceImagePanelProps) {
-  const { processingSlides, getSlideEditState, toggleSlideReference, removeSlideUploadedImage } =
+  const { processingSlides, slideEditStates, toggleSlideReference, removeSlideUploadedImage } =
     useSlideEditorStore()
 
-  const editState = getSlideEditState(slideId)
-  const { selectedReferenceIds, uploadedImages } = editState
+  const editState = slideEditStates[slideId]
+  const selectedReferenceIds = editState?.selectedReferenceIds || new Set<string>()
+  const uploadedImages = editState?.uploadedImages || []
   const isEditExecuting = processingSlides[slideId]?.type === 'edit'
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -40,11 +43,14 @@ export function ReferenceImagePanel({
     isSlide: false
   }))
 
+  // Combine current session uploads with past reference images for the uploaded tab
+  const allUploadedImages: ReferenceImage[] = [...uploadedReferenceImages, ...pastReferenceImages]
+
   const getDisplayImages = (): ReferenceImage[] => {
     if (referenceTab === 'current') {
       return currentSlides
     } else if (referenceTab === 'uploaded') {
-      return uploadedReferenceImages
+      return allUploadedImages
     } else {
       return historyImages
     }

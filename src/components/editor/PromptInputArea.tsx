@@ -1,4 +1,4 @@
-import { Wand2, Loader2, History, ChevronRight, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Wand2, Loader2, Info, ChevronRight, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -143,10 +143,10 @@ export function PromptInputArea({
         <div className="flex-1 lg:hidden" />
         {selectedReferenceIds.size === 0 && <div className="hidden lg:block flex-1" />}
 
-        {/* History button */}
+        {/* Slide info button */}
         <Button variant="outline" size="sm" onClick={onOpenDrawer} className="gap-1 flex-shrink-0">
-          <History className="h-4 w-4" />
-          履歴
+          <Info className="h-4 w-4" />
+          情報
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>

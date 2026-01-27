@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, FolderOpen, Settings, Loader2, Clock, Trash2, History } from 'lucide-react'
+import { Upload, FolderOpen, Settings, Clock, Trash2, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useProjectStore } from '@/stores/projectStore'
@@ -116,7 +116,7 @@ export function HomePage() {
   const handleDeleteFromHistory = useCallback(
     async (e: React.MouseEvent, projectId: string) => {
       e.stopPropagation()
-      if (confirm('このプロジェクトを履歴から削除しますか？')) {
+      if (confirm('このプロジェクトのデータを完全に削除しますか？')) {
         await deleteFromOpfs(projectId)
       }
     },
@@ -264,7 +264,7 @@ export function HomePage() {
           )}
 
           <section>
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">新規プロジェクト</h2>
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">ファイルから始める</h2>
             <div className="grid gap-4 md:grid-cols-2">
               <Card
                 className="cursor-pointer transition-shadow hover:shadow-md"
@@ -370,6 +370,7 @@ export function HomePage() {
         </div>
       </main>
 
+      {/* Hidden file inputs */}
       <input
         ref={fileInputRef}
         type="file"
@@ -385,12 +386,15 @@ export function HomePage() {
         onChange={handleProjectFileChange}
       />
 
+      {/* Loading overlay */}
       {isLoading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="flex flex-col items-center gap-4 rounded-lg bg-white p-8 shadow-xl">
-            <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
-            <p className="text-lg font-medium text-gray-900">{loadingMessage}</p>
-          </div>
+          <Card className="w-64">
+            <CardHeader className="items-center">
+              <div className="mb-2 h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+              <CardDescription>{loadingMessage || '処理中...'}</CardDescription>
+            </CardHeader>
+          </Card>
         </div>
       )}
     </div>
