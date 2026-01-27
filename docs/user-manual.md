@@ -74,7 +74,11 @@ SlideFlow は、NotebookLM で生成されたスライド PDF を Google Gemini 
 
 - サムネイルをクリックすると、そのプロジェクトを直接開けます
 - ホバー時に表示されるゴミ箱アイコンで履歴から削除できます
-- FIFOで、10件を超える履歴については自動で削除されます。
+- FIFO で、10件を超える履歴については自動で削除されます
+
+> **注意**: この機能は [Origin Private File System (OPFS)](https://developer.mozilla.org/ja/docs/Web/API/File_System_API/Origin_private_file_system) を使用してブラウザ内にプロジェクトデータを保存しています。OPFS に対応したブラウザ（Chrome 86+、Firefox 111+、Safari 15.2+、Edge 86+）でのみ利用可能です。非対応ブラウザでは「最近のプロジェクト」セクションは表示されません。
+>
+> **プライベートブラウジング（シークレットモード）について**: プライベートブラウジングモードでは OPFS が利用できないか、ブラウザを閉じるとデータが消去されるため、この機能は正常に動作しない場合があります。
 
 ---
 
