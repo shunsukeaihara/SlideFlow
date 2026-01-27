@@ -16,7 +16,7 @@ import { useProjectStore } from '@/stores/projectStore'
 import { useImageOperations } from '@/hooks/useImageOperations'
 import { useReferenceImages } from '@/hooks/useReferenceImages'
 import { useReferenceSelection } from '@/hooks/useReferenceSelection'
-import { editImage, isGeminiInitialized } from '@/lib/gemini'
+import { generateImageFromReference, isGeminiInitialized } from '@/lib/gemini'
 import { convertReferenceIdsToImageData } from '@/lib/referenceImageUtils'
 import { getReferencesByIds, getReferenceById } from '@/lib/getReferenceById'
 import { cn } from '@/lib/utils'
@@ -92,32 +92,19 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
           alert('画像データが見つかりません。')
           return
         }
-        resultImageDataUrl = await editImage(
-          firstImageData.dataUrl,
+        resultImageDataUrl = await generateImageFromReference(
           `以下のプロンプトに基づいて新しいスライドを生成してください。元の画像は参考程度にしてください。\n\n${prompt}`,
-          project?.settings.systemPrompt
-        )
-      } else if (selectedReferences.length === 1) {
-        // Single reference image
-        resultImageDataUrl = await editImage(
-          selectedReferences[0].dataUrl,
-          prompt,
-          project?.settings.systemPrompt
+          project?.settings.systemPrompt,
+          [firstImageData.dataUrl]
         )
       } else {
-        // Multiple reference images: use first as base, describe others in prompt
-        const baseImage = selectedReferences[0]
-        const additionalRefs = selectedReferences.slice(1)
-        const refDescription = additionalRefs
-          .map((ref, i) => `参照画像${i + 2}: ${ref.name}`)
-          .join('\n')
+        // One or more reference images
+        const referenceImageDataUrls = selectedReferences.map((ref) => ref.dataUrl)
 
-        const fullPrompt = `${prompt}\n\n追加の参照画像があります:\n${refDescription}\n\n※複数の参照画像のスタイルや内容を参考にしてください。`
-
-        resultImageDataUrl = await editImage(
-          baseImage.dataUrl,
-          fullPrompt,
-          project?.settings.systemPrompt
+        resultImageDataUrl = await generateImageFromReference(
+          prompt,
+          project?.settings.systemPrompt,
+          referenceImageDataUrls
         )
       }
 

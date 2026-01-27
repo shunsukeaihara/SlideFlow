@@ -288,10 +288,14 @@ export function EditorPage() {
         throw new Error('Current image data not found')
       }
 
+      // Extract reference image data URLs
+      const referenceImageDataUrls = selectedReferences.map((ref) => ref.dataUrl)
+
       const resultImageDataUrl = await editImage(
         currentImageData.dataUrl,
         fullPrompt,
-        project?.settings.systemPrompt
+        project?.settings.systemPrompt,
+        referenceImageDataUrls
       )
 
       // Convert reference IDs to image data
