@@ -36,6 +36,7 @@ interface ProjectState {
   projectHistory: ProjectHistoryEntry[]
 
   setProject: (project: Project | null) => void
+  clearProject: () => void
   setSelectedSlide: (slideId: string | null) => void
   setLoading: (loading: boolean) => void
 
@@ -104,6 +105,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   setProject: (project) => {
     set({ project, selectedSlideId: project?.slides[0]?.id ?? null })
+  },
+
+  clearProject: () => {
+    set({ project: null, selectedSlideId: null })
   },
 
   setSelectedSlide: (slideId) => set({ selectedSlideId: slideId }),

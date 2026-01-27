@@ -164,12 +164,12 @@ export function PromptInputArea({
 
         {/* Bottom row: OCR checkbox (left) + Edit button (right) */}
         <div className="flex items-center justify-between flex-shrink-0">
-          <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer min-w-0 flex-1 mr-2">
+          <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer min-w-0 flex-1 mr-2 ml-1">
             <Checkbox
               checked={includeOcrResult}
               onCheckedChange={(checked) => handleIncludeOcrChange(checked === true)}
               disabled={isEditExecuting || isSlideProcessing}
-              className="flex-shrink-0"
+              className="flex-shrink-0 !border-gray-400"
             />
             <span className="truncate">OCR結果をプロンプトに含める</span>
           </label>

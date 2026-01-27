@@ -17,6 +17,7 @@ export function HomePage() {
   const {
     isLoading,
     setProject,
+    clearProject,
     createProject,
     setLoading,
     appSettings,
@@ -28,6 +29,11 @@ export function HomePage() {
 
   const isApiKeyMissing = !appSettings.apiKey
   const hasOpfsSupport = isOpfsSupported()
+
+  // HomePageに来たらプロジェクトをクリア
+  useEffect(() => {
+    clearProject()
+  }, [clearProject])
 
   // 起動時に履歴を読み込む
   useEffect(() => {
