@@ -1,5 +1,4 @@
 import { useRef, useState, useCallback } from 'react'
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { OcrOverlay } from '@/components/OcrOverlay'
 import { SlideToolbar } from '@/components/SlideToolbar'
 import { SlideOverlay } from '@/components/editor/SlideOverlay'
@@ -58,46 +57,39 @@ export function SlidePreview({
       )}
 
       <div className="h-full w-full flex items-center justify-center">
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <div
-              className="relative"
-              style={{
-                maxHeight: '100%',
-                maxWidth: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              {imageData && (
-                <>
-                  <img
-                    ref={handleImageRef}
-                    src={imageData.dataUrl}
-                    alt={`Slide ${slideNumber}`}
-                    className="rounded-lg shadow-lg"
-                    style={{
-                      display: 'block',
-                      maxWidth: '100%',
-                      maxHeight: '100%',
-                      width: 'auto',
-                      height: 'auto',
-                      objectFit: 'contain'
-                    }}
-                  />
-                  {imageData.ocrCache && imageElement && showOcrOverlay && (
-                    <OcrOverlay ocrResult={imageData.ocrCache} imageElement={imageElement} />
-                  )}
-                </>
+        <div
+          className="relative"
+          style={{
+            maxHeight: '100%',
+            maxWidth: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          {imageData && (
+            <>
+              <img
+                ref={handleImageRef}
+                src={imageData.dataUrl}
+                alt={`Slide ${slideNumber}`}
+                className="rounded-lg shadow-lg"
+                style={{
+                  display: 'block',
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  width: 'auto',
+                  height: 'auto',
+                  objectFit: 'contain'
+                }}
+              />
+              {imageData.ocrCache && imageElement && showOcrOverlay && (
+                <OcrOverlay ocrResult={imageData.ocrCache} imageElement={imageElement} />
               )}
-            </div>
-          </ContextMenuTrigger>
-          <ContextMenuContent>
-            {/* Context menu content can be added here for other features if needed */}
-          </ContextMenuContent>
-        </ContextMenu>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Processing Overlay - covers entire SlidePreview */}
