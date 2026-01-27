@@ -49,7 +49,8 @@ export function EditorPage() {
     addEditHistory,
     revertToHistory,
     clearSlideOcrResult,
-    setSlideOcrResult
+    setSlideOcrResult,
+    saveToOpfs
   } = useProjectStore()
 
   // Processing store
@@ -112,6 +113,18 @@ export function EditorPage() {
     mediaQuery.addEventListener('change', handleChange)
     return () => mediaQuery.removeEventListener('change', handleChange)
   }, [])
+
+  // Auto-save to OPFS when project changes (debounced)
+  const projectUpdatedAt = project?.updatedAt
+  useEffect(() => {
+    if (!projectUpdatedAt) return
+
+    const timeoutId = setTimeout(() => {
+      saveToOpfs()
+    }, 1000) // 1秒のデバウンス
+
+    return () => clearTimeout(timeoutId)
+  }, [projectUpdatedAt, saveToOpfs])
 
   const selectedSlide = project?.slides.find((s) => s.id === selectedSlideId)
   const selectedSlideImageData = getCurrentImageData(selectedSlide)

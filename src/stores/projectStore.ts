@@ -8,6 +8,13 @@ import type {
   Image
 } from '@/types/project'
 import { v4 as uuidv4 } from 'uuid'
+import {
+  saveProjectToOpfs,
+  loadProjectFromOpfs,
+  getProjectHistory,
+  deleteProjectFromOpfs,
+  type ProjectHistoryEntry
+} from '@/lib/opfs'
 
 // Helper function to detect file type from data URL
 function getFileTypeFromDataUrl(dataUrl: string): string {
@@ -26,6 +33,7 @@ interface ProjectState {
   selectedSlideId: string | null
   isLoading: boolean
   appSettings: AppSettings
+  projectHistory: ProjectHistoryEntry[]
 
   setProject: (project: Project | null) => void
   setSelectedSlide: (slideId: string | null) => void
@@ -74,6 +82,12 @@ interface ProjectState {
 
   // Project name
   updateProjectName: (name: string) => void
+
+  // OPFS actions
+  saveToOpfs: () => Promise<void>
+  loadFromOpfs: (projectId: string) => Promise<boolean>
+  loadProjectHistory: () => Promise<void>
+  deleteFromOpfs: (projectId: string) => Promise<void>
 }
 
 const defaultAppSettings: AppSettings = {
@@ -85,6 +99,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   selectedSlideId: null,
   isLoading: false,
   appSettings: defaultAppSettings,
+  projectHistory: [],
 
   setProject: (project) => {
     set({ project, selectedSlideId: project?.slides[0]?.id ?? null })
@@ -532,5 +547,62 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         updatedAt: Date.now()
       }
     })
+  },
+
+  // OPFS actions
+  saveToOpfs: async () => {
+    const { project } = get()
+    if (!project) return
+
+    try {
+      await saveProjectToOpfs(project)
+      // 履歴を更新
+      const history = await getProjectHistory()
+      set({ projectHistory: history })
+    } catch (error) {
+      console.error('Failed to save project to OPFS:', error)
+    }
+  },
+
+  loadFromOpfs: async (projectId) => {
+    try {
+      set({ isLoading: true })
+      const project = await loadProjectFromOpfs(projectId)
+      if (project) {
+        // 履歴の並び順が変わっているので再取得
+        const history = await getProjectHistory()
+        set({
+          project,
+          selectedSlideId: project.slides[0]?.id ?? null,
+          projectHistory: history
+        })
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('Failed to load project from OPFS:', error)
+      return false
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  loadProjectHistory: async () => {
+    try {
+      const history = await getProjectHistory()
+      set({ projectHistory: history })
+    } catch (error) {
+      console.error('Failed to load project history:', error)
+    }
+  },
+
+  deleteFromOpfs: async (projectId) => {
+    try {
+      await deleteProjectFromOpfs(projectId)
+      const history = await getProjectHistory()
+      set({ projectHistory: history })
+    } catch (error) {
+      console.error('Failed to delete project from OPFS:', error)
+    }
   }
 }))

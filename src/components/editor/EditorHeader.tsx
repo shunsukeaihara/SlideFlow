@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowLeft, Download, Save, Settings, Loader2, Menu, X, Pencil, Check } from 'lucide-react'
+import { ArrowLeft, Download, Settings, Loader2, Menu, X, Pencil, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useProjectStore } from '@/stores/projectStore'
@@ -128,16 +128,22 @@ export function EditorHeader({
 
       {/* Desktop: Action buttons */}
       <div className="hidden md:flex items-center gap-2 flex-shrink-0">
-        <Button variant="outline" size="sm" onClick={onSave} disabled={isSaving}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onSave}
+          disabled={isSaving}
+          title="プロジェクトファイルをダウンロード"
+        >
           {isSaving ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              保存中...
+              ダウンロード中...
             </>
           ) : (
             <>
-              <Save className="mr-2 h-4 w-4" />
-              保存
+              <Download className="mr-2 h-4 w-4" />
+              ダウンロード
             </>
           )}
         </Button>
@@ -186,9 +192,9 @@ export function EditorHeader({
                 {isSaving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Save className="h-4 w-4" />
+                  <Download className="h-4 w-4" />
                 )}
-                {isSaving ? '保存中...' : '保存'}
+                {isSaving ? 'ダウンロード中...' : 'ダウンロード'}
               </button>
               <button
                 onClick={() => handleMenuAction(onExportPdf)}

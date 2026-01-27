@@ -71,7 +71,7 @@ export async function loadProjectFromZipBase64(base64: string): Promise<Project>
   return loadProjectFromZipData(zip)
 }
 
-async function loadProjectFromZipData(zip: JSZip): Promise<Project> {
+export async function loadProjectFromZipData(zip: JSZip): Promise<Project> {
   const projectFile = zip.file(PROJECT_FILE_NAME)
   if (!projectFile) {
     throw new Error('Invalid project file: project.json not found')
