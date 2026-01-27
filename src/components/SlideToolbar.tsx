@@ -154,7 +154,7 @@ export function SlideToolbar({
 
         {/* Toolbar content - hidden when minimized */}
         {!isMinimized && (
-          <div className="flex flex-col gap-1 py-2 px-0">
+          <div className="flex flex-col gap-1 py-2 px-0.5">
             {/* OCR Execute Button */}
             <Button
               variant="ghost"
