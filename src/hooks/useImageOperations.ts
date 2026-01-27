@@ -10,7 +10,7 @@ export function useImageOperations(project: Project | null) {
       if (!slide || !project?.images) return undefined
       return project.images[slide.image.currentImageId]
     },
-    [project?.images]
+    [project]
   )
 
   const getOriginalImageData = useCallback(
@@ -18,7 +18,7 @@ export function useImageOperations(project: Project | null) {
       if (!slide || !project?.images) return undefined
       return project.images[slide.image.originalImageId]
     },
-    [project?.images]
+    [project]
   )
 
   return {
