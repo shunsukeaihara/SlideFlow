@@ -1,6 +1,8 @@
 import { Wand2, Loader2, History, ChevronRight, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
+import { SelectedReferencesPopover } from './SelectedReferencesPopover'
 import type { ReferenceImage } from '@/types/referenceImage'
 
 interface PromptInputAreaProps {
@@ -36,6 +38,10 @@ export function PromptInputArea({
     return allReferences.find((ref) => ref.id === id) || null
   }
 
+  const selectedReferences = Array.from(selectedReferenceIds)
+    .map((id) => ({ id, ref: getReference(id) }))
+    .filter((item): item is { id: string; ref: ReferenceImage } => item.ref !== null)
+
   return (
     <div className="p-4 flex flex-col gap-2 h-full overflow-hidden">
       {/* Top row: Reference button + Selected References + History button */}
@@ -55,51 +61,65 @@ export function PromptInputArea({
           参照画像
         </Button>
 
-        {/* Selected References */}
+        {/* Selected References - Responsive display */}
         {selectedReferenceIds.size > 0 && (
           <>
             <span className="text-xs text-gray-400 flex-shrink-0">|</span>
-            <span className="text-xs text-gray-500 flex-shrink-0">参照中:</span>
-            <div className="flex items-center gap-1 overflow-x-auto flex-1">
-              {Array.from(selectedReferenceIds).map((id) => {
-                const ref = getReference(id)
-                if (!ref) return null
 
-                return (
-                  <div
-                    key={id}
-                    className="relative flex-shrink-0 w-10 h-6 rounded border-2 border-blue-500 overflow-hidden"
-                  >
-                    <img
-                      src={ref.dataUrl}
-                      alt={ref.name}
-                      className="w-full h-full object-cover"
-                    />
-                    <button
-                      className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl hover:bg-red-600 disabled:opacity-50"
-                      onClick={() => onRemoveReference(id)}
-                      disabled={isEditExecuting}
-                    >
-                      <X className="h-2 w-2" />
-                    </button>
-                  </div>
-                )
-              })}
+            {/* Compact badge for narrow screens */}
+            <div className="flex-shrink-0 lg:hidden">
+              <SelectedReferencesPopover
+                selectedReferenceIds={selectedReferenceIds}
+                allReferences={allReferences}
+                onRemoveReference={onRemoveReference}
+                onClearAllReferences={onClearAllReferences}
+                disabled={isEditExecuting}
+              />
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClearAllReferences}
-              disabled={isEditExecuting}
-              className="h-6 text-xs flex-shrink-0 px-2"
-            >
-              解除
-            </Button>
+
+            {/* Inline thumbnails for wide screens */}
+            <div className="hidden lg:flex items-center gap-1 flex-1 min-w-0">
+              <span className="text-xs text-gray-500 flex-shrink-0">参照中:</span>
+              <ScrollArea className="flex-1">
+                <div className="flex items-center gap-1 w-max">
+                  {selectedReferences.map(({ id, ref }) => (
+                    <div
+                      key={id}
+                      className="relative flex-shrink-0 w-10 h-6 rounded border-2 border-blue-500 overflow-hidden group"
+                    >
+                      <img
+                        src={ref.dataUrl}
+                        alt={ref.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                        onClick={() => onRemoveReference(id)}
+                        disabled={isEditExecuting}
+                      >
+                        <X className="h-2 w-2" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" className="h-1.5" />
+              </ScrollArea>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClearAllReferences}
+                disabled={isEditExecuting}
+                className="h-6 text-xs flex-shrink-0 px-2"
+              >
+                解除
+              </Button>
+            </div>
           </>
         )}
 
         {/* Spacer to push history button to right */}
-        {selectedReferenceIds.size === 0 && <div className="flex-1" />}
+        <div className="flex-1 lg:hidden" />
+        {selectedReferenceIds.size === 0 && <div className="hidden lg:block flex-1" />}
 
         {/* History button */}
         <Button variant="outline" size="sm" onClick={onOpenDrawer} className="gap-1 flex-shrink-0">
