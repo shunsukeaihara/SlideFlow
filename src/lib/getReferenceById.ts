@@ -1,4 +1,4 @@
-import type { Project } from '@/types/project'
+import type { Project, Slide, Image } from '@/types/project'
 import type { ReferenceImage } from '@/types/referenceImage'
 
 /**
@@ -9,7 +9,7 @@ export function getReferenceById(
   id: string,
   project: Project | null,
   uploadedImages: ReferenceImage[],
-  getCurrentImageData: (slide: any) => any
+  getCurrentImageData: (slide: Slide | undefined) => Image | undefined
 ): ReferenceImage | null {
   // Find in uploaded images
   const uploaded = uploadedImages.find((img) => img.id === id)
@@ -84,7 +84,7 @@ export function getReferencesByIds(
   ids: Set<string> | string[],
   project: Project | null,
   uploadedImages: ReferenceImage[],
-  getCurrentImageData: (slide: any) => any
+  getCurrentImageData: (slide: Slide | undefined) => Image | undefined
 ): ReferenceImage[] {
   const idsArray = Array.isArray(ids) ? ids : Array.from(ids)
   return idsArray

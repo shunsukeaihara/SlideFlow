@@ -1,12 +1,12 @@
 import { useMemo } from 'react'
-import type { Project, Slide } from '@/types/project'
+import type { Project, Slide, Image } from '@/types/project'
 import type { ReferenceImage } from '@/types/referenceImage'
 
 interface UseReferenceImagesOptions {
   project: Project | null
   selectedSlideId: string | null
   uploadedImages: ReferenceImage[]
-  getCurrentImageData: (slide: Slide | undefined) => any
+  getCurrentImageData: (slide: Slide | undefined) => Image | undefined
 }
 
 /**
@@ -74,7 +74,7 @@ export function useReferenceImages({
         } as ReferenceImage
       })
       .filter((img): img is ReferenceImage => img !== null)
-  }, [project?.slides, project?.images])
+  }, [project])
 
   // History images (all result images from edit history)
   const historyImages: ReferenceImage[] = useMemo(() => {
@@ -95,7 +95,7 @@ export function useReferenceImages({
       })
     })
     return images
-  }, [project?.slides, project?.images])
+  }, [project])
 
   // All references combined
   const allReferences: ReferenceImage[] = useMemo(

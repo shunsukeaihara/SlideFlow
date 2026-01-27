@@ -124,6 +124,7 @@ export async function extractTextWithTesseract(dataUrl: string): Promise<OcrText
 
     if (textBlocks.length === 0) {
       // Fallback to simple text extraction
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = result.data as any
       if (data.text && data.text.trim()) {
         console.log('[Tesseract] Fallback: creating single text block')

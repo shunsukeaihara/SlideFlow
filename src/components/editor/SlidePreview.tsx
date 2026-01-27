@@ -1,8 +1,8 @@
-import { useRef } from 'react'
-import { Loader2 } from 'lucide-react'
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { useRef, useState, useCallback } from 'react'
 import { OcrOverlay } from '@/components/OcrOverlay'
 import { SlideToolbar } from '@/components/SlideToolbar'
+import { SlideOverlay } from '@/components/editor/SlideOverlay'
+import { useProcessingStore } from '@/stores/processingStore'
 import type { Image } from '@/types/project'
 
 interface SlidePreviewProps {
@@ -13,8 +13,6 @@ interface SlidePreviewProps {
   onToggleOcrOverlay: () => void
   onExecuteOcr: () => void
   onClearOcr: () => void
-  isOcrProcessing: boolean
-  ocrStatus: string
 }
 
 export function SlidePreview({
@@ -24,12 +22,19 @@ export function SlidePreview({
   showOcrOverlay,
   onToggleOcrOverlay,
   onExecuteOcr,
-  onClearOcr,
-  isOcrProcessing,
-  ocrStatus
+  onClearOcr
 }: SlidePreviewProps) {
-  const imageRef = useRef<HTMLImageElement>(null)
+  // Use state instead of ref to track image element for OcrOverlay
+  const [imageElement, setImageElement] = useState<HTMLImageElement | null>(null)
   const imageContainerRef = useRef<HTMLDivElement>(null)
+
+  const handleImageRef = useCallback((element: HTMLImageElement | null) => {
+    setImageElement(element)
+  }, [])
+
+  // processingStoreから処理状態を取得
+  const processingState = useProcessingStore((state) => state.processingSlides[slideId])
+  const isSlideProcessing = !!processingState
 
   return (
     <div
@@ -46,63 +51,49 @@ export function SlidePreview({
           onExecuteOcr={onExecuteOcr}
           onToggleVisibility={onToggleOcrOverlay}
           onClearOcr={onClearOcr}
-          isProcessing={isOcrProcessing}
+          isProcessing={isSlideProcessing}
           containerRef={imageContainerRef}
         />
       )}
 
       <div className="h-full w-full flex items-center justify-center">
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <div
-              className="relative"
-              style={{
-                maxHeight: '100%',
-                maxWidth: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              {imageData && (
-                <>
-                  <img
-                    ref={imageRef}
-                    src={imageData.dataUrl}
-                    alt={`Slide ${slideNumber}`}
-                    className="rounded-lg shadow-lg"
-                    style={{
-                      display: 'block',
-                      maxWidth: '100%',
-                      maxHeight: '100%',
-                      width: 'auto',
-                      height: 'auto',
-                      objectFit: 'contain'
-                    }}
-                  />
-                  {imageData.ocrCache && imageRef.current && showOcrOverlay && (
-                    <OcrOverlay ocrResult={imageData.ocrCache} imageElement={imageRef.current} />
-                  )}
-                </>
+        <div
+          className="relative"
+          style={{
+            maxHeight: '100%',
+            maxWidth: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          {imageData && (
+            <>
+              <img
+                ref={handleImageRef}
+                src={imageData.dataUrl}
+                alt={`Slide ${slideNumber}`}
+                className="rounded-lg shadow-lg"
+                style={{
+                  display: 'block',
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  width: 'auto',
+                  height: 'auto',
+                  objectFit: 'contain'
+                }}
+              />
+              {imageData.ocrCache && imageElement && showOcrOverlay && (
+                <OcrOverlay ocrResult={imageData.ocrCache} imageElement={imageElement} />
               )}
-              {isOcrProcessing && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
-                  <div className="bg-white rounded-lg p-6 shadow-xl max-w-sm w-full mx-4">
-                    <div className="flex items-center gap-3">
-                      <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                      <span className="text-lg font-medium">{ocrStatus}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </ContextMenuTrigger>
-          <ContextMenuContent>
-            {/* Context menu content can be added here for other features if needed */}
-          </ContextMenuContent>
-        </ContextMenu>
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Processing Overlay - covers entire SlidePreview */}
+      {processingState && <SlideOverlay status={processingState.status} />}
     </div>
   )
 }

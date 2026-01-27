@@ -7,7 +7,8 @@ interface PromptInputAreaProps {
   prompt: string
   onPromptChange: (value: string) => void
   onEdit: () => void
-  isEditing: boolean
+  isEditExecuting: boolean
+  isSlideProcessing: boolean
   showReferencePanel: boolean
   onToggleReferencePanel: () => void
   selectedReferenceIds: Set<string>
@@ -21,7 +22,8 @@ export function PromptInputArea({
   prompt,
   onPromptChange,
   onEdit,
-  isEditing,
+  isEditExecuting,
+  isSlideProcessing,
   showReferencePanel,
   onToggleReferencePanel,
   selectedReferenceIds,
@@ -43,6 +45,7 @@ export function PromptInputArea({
               variant="ghost"
               size="sm"
               onClick={onToggleReferencePanel}
+              disabled={isEditExecuting}
               className="gap-1 text-gray-600"
             >
               {showReferencePanel ? (
@@ -72,8 +75,9 @@ export function PromptInputArea({
                           className="w-full h-full object-cover"
                         />
                         <button
-                          className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl hover:bg-red-600"
+                          className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl hover:bg-red-600 disabled:opacity-50"
                           onClick={() => onRemoveReference(id)}
+                          disabled={isEditExecuting}
                         >
                           <X className="h-2 w-2" />
                         </button>
@@ -85,6 +89,7 @@ export function PromptInputArea({
                   variant="ghost"
                   size="sm"
                   onClick={onClearAllReferences}
+                  disabled={isEditExecuting}
                   className="h-7 text-xs flex-shrink-0"
                 >
                   すべて解除
@@ -97,12 +102,16 @@ export function PromptInputArea({
             onChange={(e) => onPromptChange(e.target.value)}
             placeholder="編集の指示を入力してください（例：背景を青空に変更、テキストのフォントを大きく）"
             className="min-h-[80px] flex-1 resize-none"
-            disabled={isEditing}
+            disabled={isEditExecuting}
           />
         </div>
         <div className="flex flex-col gap-2 justify-end">
-          <Button onClick={onEdit} disabled={isEditing || !prompt.trim()} className="min-w-[100px]">
-            {isEditing ? (
+          <Button
+            onClick={onEdit}
+            disabled={isSlideProcessing || !prompt.trim()}
+            className="min-w-[100px]"
+          >
+            {isEditExecuting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 編集中...

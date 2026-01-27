@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Download, Save, Settings, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -9,9 +9,9 @@ import { PromptInputArea } from '@/components/editor/PromptInputArea'
 import { ReferenceImagePanel } from '@/components/editor/ReferenceImagePanel'
 import { EditHistoryDrawer } from '@/components/editor/EditHistoryDrawer'
 import { useProjectStore } from '@/stores/projectStore'
+import { useProcessingStore, type UploadedImage } from '@/stores/processingStore'
 import { useImageOperations } from '@/hooks/useImageOperations'
 import { useReferenceImages } from '@/hooks/useReferenceImages'
-import { useReferenceSelection } from '@/hooks/useReferenceSelection'
 import { editImage, isGeminiInitialized, initializeGemini } from '@/lib/gemini'
 import { extractText } from '@/lib/ocr'
 import { createPdfFromImages } from '@/lib/pdf'
@@ -23,29 +23,14 @@ import {
 
 export function EditorPage() {
   const navigate = useNavigate()
-  const [prompt, setPrompt] = useState('')
-  const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [addSlideDialogOpen, setAddSlideDialogOpen] = useState(false)
   const [addSlideInsertIndex, setAddSlideInsertIndex] = useState(0)
   const [showReferencePanel, setShowReferencePanel] = useState(false)
   const [showOcrOverlay, setShowOcrOverlay] = useState(true)
-  const [isOcrProcessing, setIsOcrProcessing] = useState(false)
-  const [ocrStatus, setOcrStatus] = useState('')
 
-  // Reference selection management
-  const {
-    selectedReferenceIds,
-    uploadedImages,
-    toggleReference: handleToggleReference,
-    removeReference,
-    clearAllReferences,
-    handleFileUpload,
-    removeUploadedImage: handleRemoveUploadedImage,
-    resetSelection
-  } = useReferenceSelection()
-
+  // Project store
   const {
     project,
     selectedSlideId,
@@ -58,6 +43,36 @@ export function EditorPage() {
     clearSlideOcrResult,
     setSlideOcrResult
   } = useProjectStore()
+
+  // Processing store
+  const {
+    processingSlides,
+    slideEditStates,
+    startSlideProcessing,
+    updateSlideProcessingStatus,
+    endSlideProcessing,
+    setSlidePrompt,
+    toggleSlideReference,
+    removeSlideReference,
+    clearSlideReferences,
+    addSlideUploadedImage,
+    removeSlideUploadedImage,
+    clearSlideEditState
+  } = useProcessingStore()
+
+  // Get current slide's edit state
+  const currentEditState = selectedSlideId ? slideEditStates[selectedSlideId] : undefined
+  const prompt = currentEditState?.prompt || ''
+  const selectedReferenceIds = useMemo(
+    () => currentEditState?.selectedReferenceIds || new Set<string>(),
+    [currentEditState?.selectedReferenceIds]
+  )
+  const uploadedImages = currentEditState?.uploadedImages || []
+
+  // Get current slide's processing state
+  const processingState = selectedSlideId ? processingSlides[selectedSlideId] : undefined
+  const isEditExecuting = processingState?.type === 'edit'
+  const isSlideProcessing = !!processingState
 
   // Custom hooks for image operations
   const { getCurrentImageData, getOriginalImageData } = useImageOperations(project)
@@ -111,72 +126,154 @@ export function EditorPage() {
     [project, deleteSlide]
   )
 
-  const handleEdit = useCallback(
-    async () => {
-      if (!selectedSlide || !prompt.trim()) return
-
-      if (!isGeminiInitialized()) {
-        alert('APIキーが設定されていません。設定画面からAPIキーを設定してください。')
-        navigate('/settings')
-        return
-      }
-
-      try {
-        setIsEditing(true)
-
-        const selectedReferences = allReferences.filter((ref) =>
-          selectedReferenceIds.has(ref.id)
-        )
-
-        // Build full prompt with references
-        const fullPrompt = buildPromptWithReferences(prompt, selectedReferences)
-
-        const currentImageData = getCurrentImageData(selectedSlide)
-        if (!currentImageData) {
-          throw new Error('Current image data not found')
-        }
-
-        const resultImageDataUrl = await editImage(
-          currentImageData.dataUrl,
-          fullPrompt,
-          project?.settings.systemPrompt
-        )
-
-        // Convert reference IDs to image data
-        const { existingImageIds, newReferenceImages } = convertReferenceIdsToImageData(
-          selectedReferences,
-          project
-        )
-
-        addEditHistory(selectedSlide.id, {
-          prompt,
-          resultImageDataUrl,
-          referenceImages: newReferenceImages.length > 0 ? newReferenceImages : undefined,
-          existingReferenceImageIds: existingImageIds.length > 0 ? existingImageIds : undefined
-        })
-
-        setPrompt('')
-        resetSelection()
-        setShowReferencePanel(false)
-      } catch (error) {
-        console.error('Failed to edit image:', error)
-        alert('画像の編集に失敗しました。' + (error instanceof Error ? error.message : ''))
-      } finally {
-        setIsEditing(false)
+  // Prompt change handler
+  const handlePromptChange = useCallback(
+    (value: string) => {
+      if (selectedSlideId) {
+        setSlidePrompt(selectedSlideId, value)
       }
     },
-    [
-      selectedSlide,
-      prompt,
-      project,
-      addEditHistory,
-      navigate,
-      allReferences,
-      selectedReferenceIds,
-      getCurrentImageData,
-      resetSelection
-    ]
+    [selectedSlideId, setSlidePrompt]
   )
+
+  // Reference toggle handler
+  const handleToggleReference = useCallback(
+    (refId: string) => {
+      if (selectedSlideId) {
+        toggleSlideReference(selectedSlideId, refId)
+      }
+    },
+    [selectedSlideId, toggleSlideReference]
+  )
+
+  // Reference remove handler
+  const handleRemoveReference = useCallback(
+    (refId: string) => {
+      if (selectedSlideId) {
+        removeSlideReference(selectedSlideId, refId)
+      }
+    },
+    [selectedSlideId, removeSlideReference]
+  )
+
+  // Clear all references handler
+  const handleClearAllReferences = useCallback(() => {
+    if (selectedSlideId) {
+      clearSlideReferences(selectedSlideId)
+    }
+  }, [selectedSlideId, clearSlideReferences])
+
+  // File upload handler
+  const handleFileUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!selectedSlideId) return
+      const files = e.target.files
+      if (!files) return
+
+      Array.from(files).forEach((file) => {
+        if (!file.type.startsWith('image/')) return
+
+        const reader = new FileReader()
+        reader.onload = (ev) => {
+          const dataUrl = ev.target?.result as string
+
+          const img = new window.Image()
+          img.onload = () => {
+            const newImage: UploadedImage = {
+              id: `upload-${Date.now()}-${Math.random()}`,
+              name: file.name,
+              dataUrl,
+              width: img.width,
+              height: img.height,
+              isSlide: false
+            }
+            addSlideUploadedImage(selectedSlideId, newImage)
+          }
+          img.src = dataUrl
+        }
+        reader.readAsDataURL(file)
+      })
+    },
+    [selectedSlideId, addSlideUploadedImage]
+  )
+
+  // Remove uploaded image handler
+  const handleRemoveUploadedImage = useCallback(
+    (imageId: string) => {
+      if (selectedSlideId) {
+        removeSlideUploadedImage(selectedSlideId, imageId)
+      }
+    },
+    [selectedSlideId, removeSlideUploadedImage]
+  )
+
+  const handleEdit = useCallback(async () => {
+    if (!selectedSlide || !prompt.trim()) return
+
+    if (!isGeminiInitialized()) {
+      alert('APIキーが設定されていません。設定画面からAPIキーを設定してください。')
+      navigate('/settings')
+      return
+    }
+
+    // Check if already processing
+    if (!startSlideProcessing(selectedSlide.id, 'edit', 'スライドの生成中...')) {
+      alert('このスライドは現在処理中です。')
+      return
+    }
+
+    try {
+      const selectedReferences = allReferences.filter((ref) => selectedReferenceIds.has(ref.id))
+
+      // Build full prompt with references
+      const fullPrompt = buildPromptWithReferences(prompt, selectedReferences)
+
+      const currentImageData = getCurrentImageData(selectedSlide)
+      if (!currentImageData) {
+        throw new Error('Current image data not found')
+      }
+
+      const resultImageDataUrl = await editImage(
+        currentImageData.dataUrl,
+        fullPrompt,
+        project?.settings.systemPrompt
+      )
+
+      // Convert reference IDs to image data
+      const { existingImageIds, newReferenceImages } = convertReferenceIdsToImageData(
+        selectedReferences,
+        project
+      )
+
+      addEditHistory(selectedSlide.id, {
+        prompt,
+        resultImageDataUrl,
+        referenceImages: newReferenceImages.length > 0 ? newReferenceImages : undefined,
+        existingReferenceImageIds: existingImageIds.length > 0 ? existingImageIds : undefined
+      })
+
+      // Clear edit state on success
+      clearSlideEditState(selectedSlide.id)
+      setShowReferencePanel(false)
+    } catch (error) {
+      console.error('Failed to edit image:', error)
+      alert('画像の編集に失敗しました。' + (error instanceof Error ? error.message : ''))
+    } finally {
+      endSlideProcessing(selectedSlide.id)
+    }
+  }, [
+    selectedSlide,
+    prompt,
+    project,
+    addEditHistory,
+    navigate,
+    allReferences,
+    selectedReferenceIds,
+    getCurrentImageData,
+    startSlideProcessing,
+    endSlideProcessing,
+    clearSlideEditState
+  ])
 
   const handleSaveProject = useCallback(async () => {
     if (!project || isSaving) return
@@ -241,20 +338,23 @@ export function EditorPage() {
   }, [selectedSlide, getOriginalImageData, addEditHistory])
 
   const handleOcrExecute = useCallback(async () => {
-    if (!selectedSlide || isOcrProcessing) return
+    if (!selectedSlide) return
+
+    // Check if already processing
+    if (!startSlideProcessing(selectedSlide.id, 'ocr', 'OCR処理を開始中...')) {
+      return
+    }
 
     const currentImageData = getCurrentImageData(selectedSlide)
     if (!currentImageData) {
       alert('画像データが見つかりません')
+      endSlideProcessing(selectedSlide.id)
       return
     }
 
-    setIsOcrProcessing(true)
-    setOcrStatus('OCR処理を開始中...')
-
     try {
       const ocrResult = await extractText(currentImageData.dataUrl, appSettings.apiKey, {
-        onProgress: (status) => setOcrStatus(status)
+        onProgress: (status) => updateSlideProcessingStatus(selectedSlide.id, status)
       })
       setSlideOcrResult(selectedSlide.id, ocrResult)
       setShowOcrOverlay(true)
@@ -262,10 +362,17 @@ export function EditorPage() {
       console.error('OCR error:', err)
       alert('OCR処理に失敗しました: ' + (err instanceof Error ? err.message : ''))
     } finally {
-      setIsOcrProcessing(false)
-      setOcrStatus('')
+      endSlideProcessing(selectedSlide.id)
     }
-  }, [selectedSlide, isOcrProcessing, appSettings.apiKey, setSlideOcrResult, getCurrentImageData])
+  }, [
+    selectedSlide,
+    appSettings.apiKey,
+    setSlideOcrResult,
+    getCurrentImageData,
+    startSlideProcessing,
+    updateSlideProcessingStatus,
+    endSlideProcessing
+  ])
 
   if (!project || !selectedSlide) {
     return null
@@ -334,8 +441,6 @@ export function EditorPage() {
             onToggleOcrOverlay={() => setShowOcrOverlay(!showOcrOverlay)}
             onExecuteOcr={handleOcrExecute}
             onClearOcr={() => clearSlideOcrResult(selectedSlide.id)}
-            isOcrProcessing={isOcrProcessing}
-            ocrStatus={ocrStatus}
           />
 
           {/* Prompt Input */}
@@ -349,20 +454,21 @@ export function EditorPage() {
                 onToggleReference={handleToggleReference}
                 onRemoveUploadedImage={handleRemoveUploadedImage}
                 onFileUpload={handleFileUpload}
-                isEditing={isEditing}
+                isEditExecuting={isEditExecuting}
               />
             )}
 
             <PromptInputArea
               prompt={prompt}
-              onPromptChange={setPrompt}
+              onPromptChange={handlePromptChange}
               onEdit={handleEdit}
-              isEditing={isEditing}
+              isEditExecuting={isEditExecuting}
+              isSlideProcessing={isSlideProcessing}
               showReferencePanel={showReferencePanel}
               onToggleReferencePanel={() => setShowReferencePanel(!showReferencePanel)}
               selectedReferenceIds={selectedReferenceIds}
-              onRemoveReference={removeReference}
-              onClearAllReferences={clearAllReferences}
+              onRemoveReference={handleRemoveReference}
+              onClearAllReferences={handleClearAllReferences}
               onOpenDrawer={() => setIsDrawerOpen(true)}
               allReferences={allReferences}
             />
