@@ -1,5 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowLeft, Download, Settings, Loader2, Menu, X, Pencil, Check } from 'lucide-react'
+import {
+  ArrowLeft,
+  Download,
+  Settings,
+  Loader2,
+  Menu,
+  X,
+  Pencil,
+  Check,
+  BookOpen
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useProjectStore } from '@/stores/projectStore'
@@ -128,6 +138,16 @@ export function EditorHeader({
 
       {/* Desktop: Action buttons */}
       <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+        <Button variant="ghost" size="sm" asChild>
+          <a
+            href="https://github.com/shunsukeaihara/SlideFlow/blob/main/docs/user-manual.md"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <BookOpen className="mr-2 h-4 w-4" />
+            使い方
+          </a>
+        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -184,6 +204,17 @@ export function EditorHeader({
           {/* Menu */}
           <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 md:hidden">
             <div className="py-1">
+              <a
+                href="https://github.com/shunsukeaihara/SlideFlow/blob/main/docs/user-manual.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <BookOpen className="h-4 w-4" />
+                使い方
+              </a>
+              <div className="border-t border-gray-100 my-1" />
               <button
                 onClick={() => handleMenuAction(onSave)}
                 disabled={isSaving}

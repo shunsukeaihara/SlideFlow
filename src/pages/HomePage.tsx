@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, FolderOpen, Settings, Clock, Trash2, History } from 'lucide-react'
+import { Upload, FolderOpen, Settings, Clock, Trash2, History, BookOpen, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useProjectStore } from '@/stores/projectStore'
@@ -13,6 +13,7 @@ export function HomePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const projectInputRef = useRef<HTMLInputElement>(null)
   const [loadingMessage, setLoadingMessage] = useState('')
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   const {
     isLoading,
@@ -142,11 +143,70 @@ export function HomePage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4 relative">
         <h1 className="text-2xl font-bold text-gray-900">SlideFlow</h1>
-        <Button variant="ghost" size="icon" onClick={handleOpenSettings}>
-          <Settings className="h-5 w-5" />
+
+        {/* Desktop: Action buttons */}
+        <div className="hidden md:flex items-center gap-2">
+          <Button variant="ghost" size="sm" asChild>
+            <a
+              href="https://github.com/shunsukeaihara/SlideFlow/blob/main/docs/user-manual.md"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <BookOpen className="mr-2 h-4 w-4" />
+              使い方
+            </a>
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleOpenSettings}>
+            <Settings className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Mobile: Hamburger menu button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className="md:hidden"
+        >
+          {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
+
+        {/* Mobile: Dropdown menu */}
+        {isMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <div className="fixed inset-0 z-40 md:hidden" onClick={() => setIsMenuOpen(false)} />
+
+            {/* Menu */}
+            <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 md:hidden">
+              <div className="py-1">
+                <a
+                  href="https://github.com/shunsukeaihara/SlideFlow/blob/main/docs/user-manual.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <BookOpen className="h-4 w-4" />
+                  使い方
+                </a>
+                <div className="border-t border-gray-100 my-1" />
+                <button
+                  onClick={() => {
+                    handleOpenSettings()
+                    setIsMenuOpen(false)
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  <Settings className="h-4 w-4" />
+                  設定
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </header>
 
       <main className="flex-1 overflow-auto p-6">
