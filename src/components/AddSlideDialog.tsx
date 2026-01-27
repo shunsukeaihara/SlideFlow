@@ -108,7 +108,9 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
         // Multiple reference images: use first as base, describe others in prompt
         const baseImage = selectedReferences[0]
         const additionalRefs = selectedReferences.slice(1)
-        const refDescription = additionalRefs.map((ref, i) => `参照画像${i + 2}: ${ref.name}`).join('\n')
+        const refDescription = additionalRefs
+          .map((ref, i) => `参照画像${i + 2}: ${ref.name}`)
+          .join('\n')
 
         const fullPrompt = `${prompt}\n\n追加の参照画像があります:\n${refDescription}\n\n※複数の参照画像のスタイルや内容を参考にしてください。`
 
@@ -128,10 +130,7 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
       })
 
       // Convert reference IDs to image data
-      const { newReferenceImages } = convertReferenceIdsToImageData(
-        selectedReferences,
-        project
-      )
+      const { newReferenceImages } = convertReferenceIdsToImageData(selectedReferences, project)
 
       addSlide(
         {
@@ -223,7 +222,7 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
                     現在のスライド
                   </TabsTrigger>
                   <TabsTrigger value="uploaded" className="text-xs">
-                    過去アップロードした画像
+                    アップロード画像
                   </TabsTrigger>
                   <TabsTrigger value="history" className="text-xs">
                     履歴のスライド

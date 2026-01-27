@@ -54,6 +54,11 @@ export function OcrOverlay({ ocrResult, imageElement }: OcrOverlayProps) {
     })
     resizeObserver.observe(imageElement)
 
+    // Also observe the parent container for resize changes
+    if (imageElement.parentElement) {
+      resizeObserver.observe(imageElement.parentElement)
+    }
+
     return () => {
       window.removeEventListener('resize', updateScale)
       resizeObserver.disconnect()

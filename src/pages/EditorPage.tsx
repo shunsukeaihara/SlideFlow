@@ -1,8 +1,8 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Download, Save, Settings, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { GripHorizontal } from 'lucide-react'
 import { AddSlideDialog } from '@/components/AddSlideDialog'
+import { EditorHeader } from '@/components/editor/EditorHeader'
 import { SlideList } from '@/components/editor/SlideList'
 import { SlidePreview } from '@/components/editor/SlidePreview'
 import { PromptInputArea } from '@/components/editor/PromptInputArea'
@@ -29,6 +29,14 @@ export function EditorPage() {
   const [addSlideInsertIndex, setAddSlideInsertIndex] = useState(0)
   const [showReferencePanel, setShowReferencePanel] = useState(false)
   const [showOcrOverlay, setShowOcrOverlay] = useState(true)
+
+  // Resize state for input area
+  const [inputAreaHeight, setInputAreaHeight] = useState(200)
+  const [isResizing, setIsResizing] = useState(false)
+  const resizeStartY = useRef(0)
+  const resizeStartHeight = useRef(0)
+  const MIN_INPUT_HEIGHT = 120
+  const MAX_INPUT_HEIGHT = 500
 
   // Project store
   const {
@@ -125,6 +133,37 @@ export function EditorPage() {
     },
     [project, deleteSlide]
   )
+
+  // Resize handlers for input area
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+    resizeStartY.current = e.clientY
+    resizeStartHeight.current = inputAreaHeight
+  }, [inputAreaHeight])
+
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!isResizing) return
+    // Dragging up (negative deltaY) increases height
+    const deltaY = resizeStartY.current - e.clientY
+    const newHeight = Math.min(MAX_INPUT_HEIGHT, Math.max(MIN_INPUT_HEIGHT, resizeStartHeight.current + deltaY))
+    setInputAreaHeight(newHeight)
+  }, [isResizing])
+
+  const handleResizeEnd = useCallback(() => {
+    setIsResizing(false)
+  }, [])
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove)
+      document.addEventListener('mouseup', handleResizeEnd)
+      return () => {
+        document.removeEventListener('mousemove', handleResizeMove)
+        document.removeEventListener('mouseup', handleResizeEnd)
+      }
+    }
+  }, [isResizing, handleResizeMove, handleResizeEnd])
 
   // Prompt change handler
   const handlePromptChange = useCallback(
@@ -386,36 +425,14 @@ export function EditorPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={handleBack}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold text-gray-900">{project.name}</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleSaveProject} disabled={isSaving}>
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                保存中...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                保存
-              </>
-            )}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportPdf}>
-            <Download className="mr-2 h-4 w-4" />
-            PDF出力
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
-            <Settings className="h-5 w-5" />
-          </Button>
-        </div>
-      </header>
+      <EditorHeader
+        projectName={project.name}
+        isSaving={isSaving}
+        onBack={handleBack}
+        onSave={handleSaveProject}
+        onExportPdf={handleExportPdf}
+        onOpenSettings={() => navigate('/settings')}
+      />
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
@@ -432,31 +449,45 @@ export function EditorPage() {
 
         {/* Center - Main Editor */}
         <main className="flex flex-1 flex-col overflow-hidden">
-          {/* Slide Preview */}
-          <SlidePreview
-            slideId={selectedSlide.id}
-            slideNumber={selectedSlide.pageNumber}
-            imageData={selectedSlideImageData}
-            showOcrOverlay={showOcrOverlay}
-            onToggleOcrOverlay={() => setShowOcrOverlay(!showOcrOverlay)}
-            onExecuteOcr={handleOcrExecute}
-            onClearOcr={() => clearSlideOcrResult(selectedSlide.id)}
-          />
+          {/* Slide Preview with Reference Panel Overlay */}
+          <div className="flex-1 min-h-0 overflow-hidden h-full relative">
+            <SlidePreview
+              slideId={selectedSlide.id}
+              slideNumber={selectedSlide.pageNumber}
+              imageData={selectedSlideImageData}
+              showOcrOverlay={showOcrOverlay}
+              onToggleOcrOverlay={() => setShowOcrOverlay(!showOcrOverlay)}
+              onExecuteOcr={handleOcrExecute}
+              onClearOcr={() => clearSlideOcrResult(selectedSlide.id)}
+            />
+
+            {/* Reference Panel - Overlay at bottom of SlidePreview */}
+            {showReferencePanel && (
+              <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg">
+                <ReferenceImagePanel
+                  currentSlides={currentSlideReferences}
+                  uploadedImages={[...pastReferenceImages, ...uploadedImages]}
+                  historyImages={historyImages}
+                  selectedReferenceIds={selectedReferenceIds}
+                  onToggleReference={handleToggleReference}
+                  onRemoveUploadedImage={handleRemoveUploadedImage}
+                  onFileUpload={handleFileUpload}
+                  isEditExecuting={isEditExecuting}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Resize Handle */}
+          <div
+            className={`flex items-center justify-center h-3 cursor-ns-resize border-t border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors select-none ${isResizing ? 'bg-gray-200' : ''}`}
+            onMouseDown={handleResizeStart}
+          >
+            <GripHorizontal className="h-3 w-3 text-gray-400" />
+          </div>
 
           {/* Prompt Input */}
-          <div className="border-t border-gray-200 bg-white">
-            {showReferencePanel && (
-              <ReferenceImagePanel
-                currentSlides={currentSlideReferences}
-                uploadedImages={[...pastReferenceImages, ...uploadedImages]}
-                historyImages={historyImages}
-                selectedReferenceIds={selectedReferenceIds}
-                onToggleReference={handleToggleReference}
-                onRemoveUploadedImage={handleRemoveUploadedImage}
-                onFileUpload={handleFileUpload}
-                isEditExecuting={isEditExecuting}
-              />
-            )}
+          <div className="border-t border-gray-200 bg-white flex flex-col overflow-hidden" style={{ height: `${inputAreaHeight}px` }}>
 
             <PromptInputArea
               prompt={prompt}

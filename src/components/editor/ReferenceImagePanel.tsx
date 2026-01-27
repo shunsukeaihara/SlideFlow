@@ -72,13 +72,13 @@ export function ReferenceImagePanel({
         className="mb-2"
       >
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="current" className="text-xs">
+          <TabsTrigger value="current" className="text-xs !text-ellipsis">
             現在のスライド
           </TabsTrigger>
-          <TabsTrigger value="uploaded" className="text-xs">
-            過去アップロードした画像
+          <TabsTrigger value="uploaded" className="text-xs !text-ellipsis">
+            アップロード画像
           </TabsTrigger>
-          <TabsTrigger value="history" className="text-xs">
+          <TabsTrigger value="history" className="text-xs !text-ellipsis">
             履歴のスライド
           </TabsTrigger>
         </TabsList>
@@ -101,9 +101,7 @@ export function ReferenceImagePanel({
                 key={ref.id}
                 className={cn(
                   'relative flex-shrink-0 w-24 rounded-lg border-2 overflow-hidden transition-all',
-                  isEditExecuting
-                    ? 'cursor-not-allowed opacity-50'
-                    : 'cursor-pointer',
+                  isEditExecuting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
                   selectedReferenceIds.has(ref.id)
                     ? 'border-blue-500'
                     : 'border-gray-200 hover:border-gray-300'

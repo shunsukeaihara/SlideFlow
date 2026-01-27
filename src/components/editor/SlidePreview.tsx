@@ -39,7 +39,7 @@ export function SlidePreview({
   return (
     <div
       ref={imageContainerRef}
-      className="relative flex-1 overflow-hidden bg-gray-100 p-4"
+      className="relative h-full overflow-hidden bg-gray-100 p-4"
       style={{ minHeight: 0 }}
     >
       {/* Floating Slide Toolbar */}
