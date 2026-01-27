@@ -2,7 +2,7 @@ import { useRef, useState, useCallback } from 'react'
 import { OcrOverlay } from '@/components/OcrOverlay'
 import { SlideToolbar } from '@/components/SlideToolbar'
 import { SlideOverlay } from '@/components/editor/SlideOverlay'
-import { useProcessingStore } from '@/stores/processingStore'
+import { useSlideEditorStore } from '@/stores/slideEditorStore'
 import type { Image } from '@/types/project'
 
 interface SlidePreviewProps {
@@ -32,8 +32,8 @@ export function SlidePreview({
     setImageElement(element)
   }, [])
 
-  // processingStoreから処理状態を取得
-  const processingState = useProcessingStore((state) => state.processingSlides[slideId])
+  // slideEditorStoreから処理状態を取得
+  const processingState = useSlideEditorStore((state) => state.processingSlides[slideId])
   const isSlideProcessing = !!processingState
 
   return (

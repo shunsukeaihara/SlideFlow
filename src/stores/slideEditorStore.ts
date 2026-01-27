@@ -25,16 +25,18 @@ export interface SlideEditState {
   prompt: string
   selectedReferenceIds: Set<string>
   uploadedImages: UploadedImage[]
+  showReferencePanel: boolean
 }
 
 // デフォルトの編集状態
 const createDefaultEditState = (): SlideEditState => ({
   prompt: '',
   selectedReferenceIds: new Set(),
-  uploadedImages: []
+  uploadedImages: [],
+  showReferencePanel: false
 })
 
-interface ProcessingState {
+interface SlideEditorStoreState {
   // 処理状態
   processingSlides: Record<string, SlideProcessingState>
 
@@ -59,9 +61,10 @@ interface ProcessingState {
   addSlideUploadedImage: (slideId: string, image: UploadedImage) => void
   removeSlideUploadedImage: (slideId: string, imageId: string) => void
   clearSlideEditState: (slideId: string) => void
+  toggleSlideReferencePanel: (slideId: string) => void
 }
 
-export const useProcessingStore = create<ProcessingState>((set, get) => ({
+export const useSlideEditorStore = create<SlideEditorStoreState>((set, get) => ({
   processingSlides: {},
   slideEditStates: {},
 
@@ -204,5 +207,17 @@ export const useProcessingStore = create<ProcessingState>((set, get) => ({
     const { [slideId]: _removed, ...remaining } = slideEditStates
     void _removed // unused variable
     set({ slideEditStates: remaining })
+  },
+
+  // 参照パネルの表示切り替え
+  toggleSlideReferencePanel: (slideId) => {
+    const { slideEditStates } = get()
+    const currentState = slideEditStates[slideId] || createDefaultEditState()
+    set({
+      slideEditStates: {
+        ...slideEditStates,
+        [slideId]: { ...currentState, showReferencePanel: !currentState.showReferencePanel }
+      }
+    })
   }
 }))

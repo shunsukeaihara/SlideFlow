@@ -9,7 +9,7 @@ import { PromptInputArea } from '@/components/editor/PromptInputArea'
 import { ReferenceImagePanel } from '@/components/editor/ReferenceImagePanel'
 import { EditHistoryDrawer } from '@/components/editor/EditHistoryDrawer'
 import { useProjectStore } from '@/stores/projectStore'
-import { useProcessingStore, type UploadedImage } from '@/stores/processingStore'
+import { useSlideEditorStore, type UploadedImage } from '@/stores/slideEditorStore'
 import { useImageOperations } from '@/hooks/useImageOperations'
 import { useReferenceImages } from '@/hooks/useReferenceImages'
 import { editImage, isGeminiInitialized, initializeGemini } from '@/lib/gemini'
@@ -27,8 +27,7 @@ export function EditorPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [addSlideDialogOpen, setAddSlideDialogOpen] = useState(false)
   const [addSlideInsertIndex, setAddSlideInsertIndex] = useState(0)
-  const [showReferencePanel, setShowReferencePanel] = useState(false)
-  const [showOcrOverlay, setShowOcrOverlay] = useState(true)
+    const [showOcrOverlay, setShowOcrOverlay] = useState(true)
 
   // Resize state for input area
   const [inputAreaHeight, setInputAreaHeight] = useState(200)
@@ -65,8 +64,9 @@ export function EditorPage() {
     clearSlideReferences,
     addSlideUploadedImage,
     removeSlideUploadedImage,
-    clearSlideEditState
-  } = useProcessingStore()
+    clearSlideEditState,
+    toggleSlideReferencePanel
+  } = useSlideEditorStore()
 
   // Get current slide's edit state
   const currentEditState = selectedSlideId ? slideEditStates[selectedSlideId] : undefined
@@ -76,6 +76,7 @@ export function EditorPage() {
     [currentEditState?.selectedReferenceIds]
   )
   const uploadedImages = currentEditState?.uploadedImages || []
+  const showReferencePanel = currentEditState?.showReferencePanel || false
 
   // Get current slide's processing state
   const processingState = selectedSlideId ? processingSlides[selectedSlideId] : undefined
@@ -291,9 +292,8 @@ export function EditorPage() {
         existingReferenceImageIds: existingImageIds.length > 0 ? existingImageIds : undefined
       })
 
-      // Clear edit state on success
+      // Clear edit state on success (this also resets showReferencePanel)
       clearSlideEditState(selectedSlide.id)
-      setShowReferencePanel(false)
     } catch (error) {
       console.error('Failed to edit image:', error)
       alert('画像の編集に失敗しました。' + (error instanceof Error ? error.message : ''))
@@ -496,7 +496,7 @@ export function EditorPage() {
               isEditExecuting={isEditExecuting}
               isSlideProcessing={isSlideProcessing}
               showReferencePanel={showReferencePanel}
-              onToggleReferencePanel={() => setShowReferencePanel(!showReferencePanel)}
+              onToggleReferencePanel={() => selectedSlideId && toggleSlideReferencePanel(selectedSlideId)}
               selectedReferenceIds={selectedReferenceIds}
               onRemoveReference={handleRemoveReference}
               onClearAllReferences={handleClearAllReferences}
