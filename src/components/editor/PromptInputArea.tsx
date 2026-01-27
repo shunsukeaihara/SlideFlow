@@ -1,6 +1,7 @@
 import { Wand2, Loader2, History, ChevronRight, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { SelectedReferencesPopover } from './SelectedReferencesPopover'
 import { useSlideEditorStore } from '@/stores/slideEditorStore'
@@ -12,6 +13,7 @@ interface PromptInputAreaProps {
   isSlideProcessing: boolean
   onOpenDrawer: () => void
   allReferences: ReferenceImage[]
+  hasOcrResult: boolean
 }
 
 export function PromptInputArea({
@@ -19,7 +21,8 @@ export function PromptInputArea({
   onEdit,
   isSlideProcessing,
   onOpenDrawer,
-  allReferences
+  allReferences,
+  hasOcrResult
 }: PromptInputAreaProps) {
   const {
     processingSlides,
@@ -27,11 +30,12 @@ export function PromptInputArea({
     setSlidePrompt,
     removeSlideReference,
     clearSlideReferences,
-    toggleSlideReferencePanel
+    toggleSlideReferencePanel,
+    setSlideIncludeOcrResult
   } = useSlideEditorStore()
 
   const editState = getSlideEditState(slideId)
-  const { prompt, selectedReferenceIds, showReferencePanel } = editState
+  const { prompt, selectedReferenceIds, showReferencePanel, includeOcrResult } = editState
   const isEditExecuting = processingSlides[slideId]?.type === 'edit'
 
   const getReference = (id: string): ReferenceImage | null => {
@@ -56,6 +60,10 @@ export function PromptInputArea({
 
   const handleToggleReferencePanel = () => {
     toggleSlideReferencePanel(slideId)
+  }
+
+  const handleIncludeOcrChange = (checked: boolean) => {
+    setSlideIncludeOcrResult(slideId, checked)
   }
 
   return (
@@ -156,8 +164,19 @@ export function PromptInputArea({
           disabled={isEditExecuting}
         />
 
-        {/* Edit button */}
-        <div className="flex flex-col justify-end flex-shrink-0">
+        {/* Edit button area */}
+        <div className="flex flex-col justify-end gap-2 flex-shrink-0">
+          {/* OCR checkbox */}
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <Checkbox
+              checked={includeOcrResult}
+              onCheckedChange={(checked) => handleIncludeOcrChange(checked === true)}
+              disabled={isEditExecuting || isSlideProcessing}
+            />
+            <span>OCR結果を含める</span>
+          </label>
+
+          {/* Edit button */}
           <Button
             onClick={onEdit}
             disabled={isSlideProcessing || !prompt.trim()}

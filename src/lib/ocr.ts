@@ -24,7 +24,7 @@ export async function extractText(
   if (apiKey) {
     try {
       console.log('[OCR] Starting Gemini refinement...')
-      onProgress?.('Gemini AI で精度向上中...')
+      onProgress?.('GeminiでOCR精度向上中...')
       refinedBlocks = await refineTesseractResults(tesseractBlocks, dataUrl, apiKey)
       console.log('[OCR] Gemini refinement completed')
     } catch (error) {

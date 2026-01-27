@@ -26,6 +26,7 @@ export interface SlideEditState {
   selectedReferenceIds: Set<string>
   uploadedImages: UploadedImage[]
   showReferencePanel: boolean
+  includeOcrResult: boolean
 }
 
 // デフォルトの編集状態
@@ -33,7 +34,8 @@ const createDefaultEditState = (): SlideEditState => ({
   prompt: '',
   selectedReferenceIds: new Set(),
   uploadedImages: [],
-  showReferencePanel: false
+  showReferencePanel: false,
+  includeOcrResult: false
 })
 
 interface SlideEditorStoreState {
@@ -62,6 +64,7 @@ interface SlideEditorStoreState {
   removeSlideUploadedImage: (slideId: string, imageId: string) => void
   clearSlideEditState: (slideId: string) => void
   toggleSlideReferencePanel: (slideId: string) => void
+  setSlideIncludeOcrResult: (slideId: string, include: boolean) => void
 }
 
 export const useSlideEditorStore = create<SlideEditorStoreState>((set, get) => ({
@@ -217,6 +220,18 @@ export const useSlideEditorStore = create<SlideEditorStoreState>((set, get) => (
       slideEditStates: {
         ...slideEditStates,
         [slideId]: { ...currentState, showReferencePanel: !currentState.showReferencePanel }
+      }
+    })
+  },
+
+  // OCR結果を含めるかの設定
+  setSlideIncludeOcrResult: (slideId, include) => {
+    const { slideEditStates } = get()
+    const currentState = slideEditStates[slideId] || createDefaultEditState()
+    set({
+      slideEditStates: {
+        ...slideEditStates,
+        [slideId]: { ...currentState, includeOcrResult: include }
       }
     })
   }

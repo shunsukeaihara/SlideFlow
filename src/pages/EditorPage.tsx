@@ -71,6 +71,7 @@ export function EditorPage() {
   )
   const uploadedImages = currentEditState?.uploadedImages || []
   const showReferencePanel = currentEditState?.showReferencePanel || false
+  const includeOcrResult = currentEditState?.includeOcrResult || false
 
   // Get current slide's processing state
   const processingState = selectedSlideId ? processingSlides[selectedSlideId] : undefined
@@ -129,20 +130,29 @@ export function EditorPage() {
   }, [])
 
   // Resize handlers for input area
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    setIsResizing(true)
-    resizeStartY.current = e.clientY
-    resizeStartHeight.current = inputAreaHeight
-  }, [inputAreaHeight])
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      setIsResizing(true)
+      resizeStartY.current = e.clientY
+      resizeStartHeight.current = inputAreaHeight
+    },
+    [inputAreaHeight]
+  )
 
-  const handleResizeMove = useCallback((e: MouseEvent) => {
-    if (!isResizing) return
-    // Dragging up (negative deltaY) increases height
-    const deltaY = resizeStartY.current - e.clientY
-    const newHeight = Math.min(MAX_INPUT_HEIGHT, Math.max(MIN_INPUT_HEIGHT, resizeStartHeight.current + deltaY))
-    setInputAreaHeight(newHeight)
-  }, [isResizing])
+  const handleResizeMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return
+      // Dragging up (negative deltaY) increases height
+      const deltaY = resizeStartY.current - e.clientY
+      const newHeight = Math.min(
+        MAX_INPUT_HEIGHT,
+        Math.max(MIN_INPUT_HEIGHT, resizeStartHeight.current + deltaY)
+      )
+      setInputAreaHeight(newHeight)
+    },
+    [isResizing]
+  )
 
   const handleResizeEnd = useCallback(() => {
     setIsResizing(false)
@@ -202,21 +212,52 @@ export function EditorPage() {
       return
     }
 
+    const currentImageData = getCurrentImageData(selectedSlide)
+    if (!currentImageData) {
+      alert('画像データが見つかりません。')
+      return
+    }
+
+    // Check if OCR is needed
+    const needsOcr = includeOcrResult && !currentImageData.ocrCache
+
     // Check if already processing
-    if (!startSlideProcessing(selectedSlide.id, 'edit', 'スライドの生成中...')) {
+    const initialStatus = needsOcr ? 'OCR処理中...' : 'スライドの生成中...'
+    if (!startSlideProcessing(selectedSlide.id, 'edit', initialStatus)) {
       alert('このスライドは現在処理中です。')
       return
     }
 
     try {
+      let ocrResult = currentImageData.ocrCache
+
+      // Run OCR if needed
+      if (needsOcr && appSettings.apiKey) {
+        try {
+          ocrResult = await extractText(currentImageData.dataUrl, appSettings.apiKey, {
+            onProgress: (status) => updateSlideProcessingStatus(selectedSlide.id, status)
+          })
+          setSlideOcrResult(selectedSlide.id, ocrResult)
+        } catch (error) {
+          console.error('OCR failed:', error)
+          // Continue without OCR if it fails
+        }
+      }
+
+      // Update status for Gemini edit
+      updateSlideProcessingStatus(selectedSlide.id, 'スライドの生成中...')
+
       const selectedReferences = allReferences.filter((ref) => selectedReferenceIds.has(ref.id))
 
-      // Build full prompt with references
-      const fullPrompt = buildPromptWithReferences(prompt, selectedReferences)
+      // Build full prompt with references and OCR result
+      let fullPrompt = buildPromptWithReferences(prompt, selectedReferences)
 
-      const currentImageData = getCurrentImageData(selectedSlide)
-      if (!currentImageData) {
-        throw new Error('Current image data not found')
+      // Include OCR result if enabled and available
+      if (includeOcrResult && ocrResult) {
+        const ocrText = ocrResult.fullText
+        if (ocrText) {
+          fullPrompt = `${fullPrompt}\n\n【現在のスライドのテキスト内容(不完全に付き画像からも認識してください。)】\n${ocrText}`
+        }
       }
 
       // Extract reference image data URLs
@@ -254,14 +295,18 @@ export function EditorPage() {
     selectedSlide,
     prompt,
     project,
+    appSettings.apiKey,
     addEditHistory,
     navigate,
     allReferences,
     selectedReferenceIds,
+    includeOcrResult,
     getCurrentImageData,
     startSlideProcessing,
+    updateSlideProcessingStatus,
     endSlideProcessing,
-    clearSlideEditState
+    clearSlideEditState,
+    setSlideOcrResult
   ])
 
   const handleSaveProject = useCallback(async () => {
@@ -453,14 +498,17 @@ export function EditorPage() {
           </div>
 
           {/* Prompt Input */}
-          <div className="border-t border-gray-200 bg-white flex flex-col overflow-hidden" style={{ height: `${inputAreaHeight}px` }}>
-
+          <div
+            className="border-t border-gray-200 bg-white flex flex-col overflow-hidden"
+            style={{ height: `${inputAreaHeight}px` }}
+          >
             <PromptInputArea
               slideId={selectedSlide.id}
               onEdit={handleEdit}
               isSlideProcessing={isSlideProcessing}
               onOpenDrawer={() => setIsDrawerOpen(true)}
               allReferences={allReferences}
+              hasOcrResult={!!selectedSlideImageData?.ocrCache}
             />
           </div>
         </main>
