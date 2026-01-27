@@ -472,7 +472,7 @@ export function EditorPage() {
         {/* Center - Main Editor */}
         <main className="flex flex-1 flex-col overflow-hidden">
           {/* Slide Preview */}
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden h-full">
             <SlidePreview
               slideId={selectedSlide.id}
               slideNumber={selectedSlide.pageNumber}
