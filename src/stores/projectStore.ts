@@ -79,6 +79,7 @@ interface ProjectState {
   // OCR actions
   setSlideOcrResult: (slideId: string, ocrResult: OcrResult) => void
   clearSlideOcrResult: (slideId: string) => void
+  setSlideOcrVisibility: (slideId: string, visible: boolean) => void
 
   // Project name
   updateProjectName: (name: string) => void
@@ -532,6 +533,26 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             ocrCache: undefined
           }
         }
+      }
+    })
+  },
+
+  setSlideOcrVisibility: (slideId, visible) => {
+    const { project } = get()
+    if (!project) return
+
+    set({
+      project: {
+        ...project,
+        updatedAt: Date.now(),
+        slides: project.slides.map((s) =>
+          s.id === slideId
+            ? {
+                ...s,
+                showOcrOverlay: visible
+              }
+            : s
+        )
       }
     })
   },

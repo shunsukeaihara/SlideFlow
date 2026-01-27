@@ -51,6 +51,7 @@ export interface Slide {
   pageNumber: number
   image: SlideImage
   editHistory: EditHistoryEntry[]
+  showOcrOverlay?: boolean
 }
 
 export interface ProjectSettings {

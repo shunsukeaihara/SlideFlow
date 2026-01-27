@@ -30,7 +30,6 @@ export function EditorPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [addSlideDialogOpen, setAddSlideDialogOpen] = useState(false)
   const [addSlideInsertIndex, setAddSlideInsertIndex] = useState(0)
-  const [showOcrOverlay, setShowOcrOverlay] = useState(true)
   const [isSlideListOpen, setIsSlideListOpen] = useState(false)
 
   // Resize state for input area
@@ -50,6 +49,7 @@ export function EditorPage() {
     revertToHistory,
     clearSlideOcrResult,
     setSlideOcrResult,
+    setSlideOcrVisibility,
     saveToOpfs
   } = useProjectStore()
 
@@ -413,7 +413,7 @@ export function EditorPage() {
         onProgress: (status) => updateSlideProcessingStatus(selectedSlide.id, status)
       })
       setSlideOcrResult(selectedSlide.id, ocrResult)
-      setShowOcrOverlay(true)
+      setSlideOcrVisibility(selectedSlide.id, true)
     } catch (err) {
       console.error('OCR error:', err)
       alert('OCR処理に失敗しました: ' + (err instanceof Error ? err.message : ''))
@@ -424,6 +424,7 @@ export function EditorPage() {
     selectedSlide,
     appSettings.apiKey,
     setSlideOcrResult,
+    setSlideOcrVisibility,
     getCurrentImageData,
     startSlideProcessing,
     updateSlideProcessingStatus,
@@ -493,8 +494,8 @@ export function EditorPage() {
               slideId={selectedSlide.id}
               slideNumber={selectedSlide.pageNumber}
               imageData={selectedSlideImageData}
-              showOcrOverlay={showOcrOverlay}
-              onToggleOcrOverlay={() => setShowOcrOverlay(!showOcrOverlay)}
+              showOcrOverlay={selectedSlide.showOcrOverlay ?? true}
+              onToggleOcrOverlay={() => setSlideOcrVisibility(selectedSlide.id, !(selectedSlide.showOcrOverlay ?? true))}
               onExecuteOcr={handleOcrExecute}
               onClearOcr={() => clearSlideOcrResult(selectedSlide.id)}
             />
