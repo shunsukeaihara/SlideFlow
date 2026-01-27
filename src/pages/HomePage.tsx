@@ -1,11 +1,12 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, FolderOpen, Settings, Loader2 } from 'lucide-react'
+import { Upload, FolderOpen, Settings, Loader2, Clock, Trash2, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useProjectStore } from '@/stores/projectStore'
 import { extractImagesFromPdf } from '@/lib/pdf'
 import { loadProjectFromZip } from '@/lib/projectFile'
+import { isOpfsSupported } from '@/lib/opfs'
 
 export function HomePage() {
   const navigate = useNavigate()
@@ -13,9 +14,27 @@ export function HomePage() {
   const projectInputRef = useRef<HTMLInputElement>(null)
   const [loadingMessage, setLoadingMessage] = useState('')
 
-  const { isLoading, setProject, createProject, setLoading, appSettings } = useProjectStore()
+  const {
+    isLoading,
+    setProject,
+    createProject,
+    setLoading,
+    appSettings,
+    projectHistory,
+    loadProjectHistory,
+    loadFromOpfs,
+    deleteFromOpfs
+  } = useProjectStore()
 
   const isApiKeyMissing = !appSettings.apiKey
+  const hasOpfsSupport = isOpfsSupported()
+
+  // 起動時に履歴を読み込む
+  useEffect(() => {
+    if (hasOpfsSupport) {
+      loadProjectHistory()
+    }
+  }, [hasOpfsSupport, loadProjectHistory])
 
   const handleUploadPdf = useCallback(() => {
     fileInputRef.current?.click()
@@ -80,6 +99,40 @@ export function HomePage() {
   const handleOpenSettings = useCallback(() => {
     navigate('/settings')
   }, [navigate])
+
+  const handleOpenFromHistory = useCallback(
+    async (projectId: string) => {
+      setLoadingMessage('プロジェクトを読み込み中...')
+      const success = await loadFromOpfs(projectId)
+      if (success) {
+        navigate('/editor')
+      } else {
+        alert('プロジェクトの読み込みに失敗しました。')
+      }
+    },
+    [loadFromOpfs, navigate]
+  )
+
+  const handleDeleteFromHistory = useCallback(
+    async (e: React.MouseEvent, projectId: string) => {
+      e.stopPropagation()
+      if (confirm('このプロジェクトを履歴から削除しますか？')) {
+        await deleteFromOpfs(projectId)
+      }
+    },
+    [deleteFromOpfs]
+  )
+
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp)
+    return date.toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -248,6 +301,72 @@ export function HomePage() {
               </Card>
             </div>
           </section>
+
+          {/* 最近のプロジェクト */}
+          {hasOpfsSupport && projectHistory.length > 0 && (
+            <section>
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
+                <Clock className="h-5 w-5" />
+                最近のプロジェクト(最大10件)
+              </h2>
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {projectHistory.map((entry) => (
+                  <Card
+                    key={entry.id}
+                    className="group min-w-0 cursor-pointer overflow-hidden transition-shadow hover:shadow-md"
+                    onClick={() => handleOpenFromHistory(entry.id)}
+                  >
+                    <CardHeader className="p-4">
+                      <div className="flex gap-3">
+                        {entry.thumbnailDataUrl ? (
+                          <div className="h-16 w-24 flex-shrink-0 overflow-hidden rounded border bg-gray-100">
+                            <img
+                              src={entry.thumbnailDataUrl}
+                              alt={entry.name}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex h-16 w-24 flex-shrink-0 items-center justify-center rounded border bg-gray-100">
+                            <FolderOpen className="h-8 w-8 text-gray-400" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <div className="flex items-start justify-between gap-1">
+                            <CardTitle className="min-w-0 flex-1 truncate text-sm">
+                              {entry.name}
+                            </CardTitle>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                              onClick={(e) => handleDeleteFromHistory(e, entry.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-red-500" />
+                            </Button>
+                          </div>
+                          <CardDescription className="mt-1 text-xs">
+                            {entry.slideCount}枚のスライド
+                          </CardDescription>
+                          <div className="mt-1 flex items-center justify-between gap-2">
+                            <CardDescription className="min-w-0 flex-1 truncate text-xs text-gray-400">
+                              {formatDate(entry.updatedAt)}
+                            </CardDescription>
+                            {entry.editCount > 0 && (
+                              <span className="flex flex-shrink-0 items-center gap-0.5 text-xs text-blue-600">
+                                <History className="h-3 w-3" />
+                                {entry.editCount}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </main>
 
