@@ -7,6 +7,7 @@
 import { saveProjectToZip, loadProjectFromZipData } from './projectFile'
 import type { Project } from '@/types/project'
 import JSZip from 'jszip'
+import { logger } from './logger'
 
 const SLIDEFLOW_DIR = 'slideflow'
 const PROJECTS_DIR = 'projects'
@@ -103,7 +104,7 @@ function generateThumbnail(project: Project): string | undefined {
  */
 export async function saveProjectToOpfs(project: Project): Promise<void> {
   if (!isOpfsSupported()) {
-    console.warn('OPFS is not supported in this browser')
+    logger.warn('OPFS is not supported in this browser')
     return
   }
 
@@ -166,7 +167,7 @@ export async function saveProjectToOpfs(project: Project): Promise<void> {
  */
 export async function loadProjectFromOpfs(projectId: string): Promise<Project | null> {
   if (!isOpfsSupported()) {
-    console.warn('OPFS is not supported in this browser')
+    logger.warn('OPFS is not supported in this browser')
     return null
   }
 
@@ -194,7 +195,7 @@ export async function loadProjectFromOpfs(projectId: string): Promise<Project | 
 
     return project
   } catch {
-    console.error(`Failed to load project ${projectId} from OPFS`)
+    logger.error(`Failed to load project ${projectId} from OPFS`)
     return null
   }
 }

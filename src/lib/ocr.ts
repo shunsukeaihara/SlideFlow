@@ -1,6 +1,7 @@
 import type { OcrResult } from '../types/project'
 import type { GeminiAPI } from '../context/GeminiContext'
 import { extractTextWithTesseract } from './tesseract'
+import { logger } from './logger'
 
 export interface OcrOptions {
   onProgress?: (status: string) => void
@@ -14,23 +15,23 @@ export async function extractText(
   const { onProgress } = options || {}
 
   // Step 1: Run Tesseract OCR to get text blocks with bounding boxes
-  console.log('[OCR] Starting Tesseract OCR...')
+  logger.log('[OCR] Starting Tesseract OCR...')
   onProgress?.('Tesseract OCR実行中...')
   const tesseractBlocks = await extractTextWithTesseract(dataUrl)
-  console.log('[OCR] Tesseract completed:', tesseractBlocks.length, 'text blocks')
+  logger.log('[OCR] Tesseract completed:', tesseractBlocks.length, 'text blocks')
 
   // Step 2: Refine with Gemini (optional - will use Tesseract results if this fails)
   let refinedBlocks = tesseractBlocks
   try {
-    console.log('[OCR] Starting Gemini refinement...')
+    logger.log('[OCR] Starting Gemini refinement...')
     onProgress?.('GeminiでOCR精度向上中...')
     refinedBlocks = await gemini.refineTesseractResults({
       tesseractBlocks,
       imageDataUrl: dataUrl
     })
-    console.log('[OCR] Gemini refinement completed')
+    logger.log('[OCR] Gemini refinement completed')
   } catch (error) {
-    console.warn('[OCR] Gemini refinement failed, using Tesseract results only:', error)
+    logger.warn('[OCR] Gemini refinement failed, using Tesseract results only:', error)
     // Continue with Tesseract results
   }
 

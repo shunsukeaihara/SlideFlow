@@ -9,6 +9,7 @@ import {
   buildOcrContents,
   processOcrResponse
 } from './prompts'
+import { logger } from '@/lib/logger'
 
 // ============================================================================
 // Client Management
@@ -153,7 +154,7 @@ export async function refineTesseractResults(
 
     return processOcrResponse(text, tesseractBlocks.length)
   } catch (error) {
-    console.error('Gemini refinement error:', error)
+    logger.error('Gemini refinement error:', error)
     throw new Error(`Gemini refinement failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }

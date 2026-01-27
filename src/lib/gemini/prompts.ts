@@ -5,6 +5,7 @@ import type {
   ContentPart,
   OcrContentMessage
 } from './types'
+import { logger } from '@/lib/logger'
 
 // ============================================================================
 // Common Utilities
@@ -158,10 +159,10 @@ export function buildOcrContents(prompt: string, imageDataUrl: string): OcrConte
 // ============================================================================
 
 export function parseOcrResponse(text: string): OcrTextBlock[] {
-  console.log('[Gemini] Raw JSON response:', text)
+  logger.debug('[Gemini] Raw JSON response:', text)
 
   const refinedBlocks = JSON.parse(text) as OcrTextBlock[]
-  console.log('[Gemini] Parsed blocks:', JSON.stringify(refinedBlocks, null, 2))
+  logger.debug('[Gemini] Parsed blocks:', JSON.stringify(refinedBlocks, null, 2))
 
   if (!Array.isArray(refinedBlocks)) {
     throw new Error('Gemini response is not an array')
@@ -173,11 +174,11 @@ export function parseOcrResponse(text: string): OcrTextBlock[] {
 export function validateOcrBlocks(blocks: OcrTextBlock[]): OcrTextBlock[] {
   return blocks.filter((block) => {
     if (!block.text || !block.bbox) {
-      console.warn('[Gemini] Skipping invalid block:', block)
+      logger.warn('[Gemini] Skipping invalid block:', block)
       return false
     }
     if (!block.text.trim()) {
-      console.warn('[Gemini] Skipping empty text block')
+      logger.warn('[Gemini] Skipping empty text block')
       return false
     }
     return true
@@ -207,7 +208,7 @@ export function processOcrResponse(text: string, originalBlockCount: number): Oc
   const validBlocks = validateOcrBlocks(refinedBlocks)
   const updatedBlocks = synchronizeLineTexts(validBlocks)
 
-  console.log(`[Gemini] Refined ${originalBlockCount} blocks to ${updatedBlocks.length} valid blocks`)
+  logger.log(`[Gemini] Refined ${originalBlockCount} blocks to ${updatedBlocks.length} valid blocks`)
 
   return updatedBlocks
 }
