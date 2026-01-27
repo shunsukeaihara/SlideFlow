@@ -118,7 +118,7 @@ project.sfpj
 3. **Save** ([src/lib/projectFile.ts](src/lib/projectFile.ts)):
    - Extract all data URLs to binary WebP files
    - Package with JSZip (DEFLATE level 9 compression)
-   - Download as `.enlm` file
+   - Download as `.sfpj` file
 
 4. **Export** ([src/lib/pdf.ts](src/lib/pdf.ts)):
    - Convert edited slides to PDF using jsPDF
