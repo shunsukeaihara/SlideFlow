@@ -20,12 +20,8 @@ export function ReferenceImagePanel({
   historyImages,
   onFileUpload
 }: ReferenceImagePanelProps) {
-  const {
-    processingSlides,
-    getSlideEditState,
-    toggleSlideReference,
-    removeSlideUploadedImage
-  } = useSlideEditorStore()
+  const { processingSlides, getSlideEditState, toggleSlideReference, removeSlideUploadedImage } =
+    useSlideEditorStore()
 
   const editState = getSlideEditState(slideId)
   const { selectedReferenceIds, uploadedImages } = editState
@@ -96,13 +92,13 @@ export function ReferenceImagePanel({
         className="mb-2"
       >
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="current" className="text-xs !text-ellipsis">
+          <TabsTrigger value="current" className="text-xs">
             現在のスライド
           </TabsTrigger>
-          <TabsTrigger value="uploaded" className="text-xs !text-ellipsis">
+          <TabsTrigger value="uploaded" className="text-xs">
             アップロード画像
           </TabsTrigger>
-          <TabsTrigger value="history" className="text-xs !text-ellipsis">
+          <TabsTrigger value="history" className="text-xs">
             履歴のスライド
           </TabsTrigger>
         </TabsList>
