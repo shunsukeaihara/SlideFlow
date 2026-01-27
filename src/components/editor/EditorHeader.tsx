@@ -91,13 +91,13 @@ export function EditorHeader({
   return (
     <header className="flex items-center justify-between border-b border-gray-200 px-4 py-2 md:py-3 relative">
       {/* Left: Back button + Project name */}
-      <div className="flex items-center gap-2 md:gap-3 min-w-0">
+      <div className={`flex items-center gap-2 md:gap-3 min-w-0 ${isEditing ? 'flex-1' : ''}`}>
         <Button variant="ghost" size="icon" onClick={onBack} className="flex-shrink-0">
           <ArrowLeft className="h-5 w-5" />
         </Button>
 
         {isEditing ? (
-          <div className="flex items-center gap-1 min-w-0">
+          <div className="flex items-center gap-1 min-w-0 flex-1 md:flex-none md:w-[70vw] md:max-w-xl">
             <Input
               ref={inputRef}
               value={editName}
@@ -106,7 +106,7 @@ export function EditorHeader({
               onBlur={handleBlur}
               onCompositionStart={() => setIsComposing(true)}
               onCompositionEnd={() => setIsComposing(false)}
-              className="h-8 text-base md:text-lg font-semibold w-48 md:w-64"
+              className="h-8 text-base md:text-lg font-semibold flex-1"
               maxLength={100}
             />
             <Button
@@ -127,7 +127,7 @@ export function EditorHeader({
             <h1 className="text-base md:text-lg font-semibold text-gray-900 truncate">
               {projectName}
             </h1>
-            <Pencil className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+            <Pencil className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
           </button>
         )}
       </div>
