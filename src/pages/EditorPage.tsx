@@ -26,6 +26,7 @@ import {
 export function EditorPage() {
   const navigate = useNavigate()
   const [isSaving, setIsSaving] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [addSlideDialogOpen, setAddSlideDialogOpen] = useState(false)
   const [addSlideInsertIndex, setAddSlideInsertIndex] = useState(0)
@@ -332,14 +333,20 @@ export function EditorPage() {
   }, [project, isSaving])
 
   const handleExportPdf = useCallback(async () => {
-    if (!project) return
+    if (!project || isExporting) return
 
+    setIsExporting(true)
     try {
-      const images = project.slides.map((s) => {
-        const imageData = project.images[s.image.currentImageId]
-        return imageData?.dataUrl || ''
+      const slides = project.slides.map((s) => {
+        const currentImage = project.images[s.image.currentImageId]
+        const originalImage = project.images[s.image.originalImageId]
+        return {
+          imageDataUrl: currentImage?.dataUrl || '',
+          originalWidth: originalImage?.width || currentImage?.width || 0,
+          originalHeight: originalImage?.height || currentImage?.height || 0
+        }
       })
-      const blob = await createPdfFromImages(images)
+      const blob = await createPdfFromImages(slides)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -349,8 +356,10 @@ export function EditorPage() {
     } catch (error) {
       console.error('Failed to export PDF:', error)
       alert('PDFの出力に失敗しました。')
+    } finally {
+      setIsExporting(false)
     }
-  }, [project])
+  }, [project, isExporting])
 
   const handleRevertToHistory = useCallback(
     (historyId: string) => {
@@ -422,6 +431,7 @@ export function EditorPage() {
       {/* Header */}
       <EditorHeader
         isSaving={isSaving}
+        isExporting={isExporting}
         onBack={handleBack}
         onSave={handleSaveProject}
         onExportPdf={handleExportPdf}
@@ -508,7 +518,6 @@ export function EditorPage() {
               isSlideProcessing={isSlideProcessing}
               onOpenDrawer={() => setIsDrawerOpen(true)}
               allReferences={allReferences}
-              hasOcrResult={!!selectedSlideImageData?.ocrCache}
             />
           </div>
         </main>

@@ -57,39 +57,41 @@ async function extractImagesFromPdfData(data: ArrayBuffer): Promise<ExtractedIma
   return slides
 }
 
-export async function createPdfFromImages(images: string[]): Promise<Blob> {
+interface SlideForPdf {
+  imageDataUrl: string
+  originalWidth: number
+  originalHeight: number
+}
+
+export async function createPdfFromImages(slides: SlideForPdf[]): Promise<Blob> {
   const { jsPDF } = await import('jspdf')
 
-  if (images.length === 0) {
+  if (slides.length === 0) {
     throw new Error('No images provided')
   }
 
-  // 最初の画像からサイズを取得
-  const firstImg = await loadImage(images[0])
+  // 最初のスライドのオリジナルサイズでPDFを初期化
+  const firstSlide = slides[0]
   const pdf = new jsPDF({
-    orientation: firstImg.width > firstImg.height ? 'landscape' : 'portrait',
+    orientation: firstSlide.originalWidth > firstSlide.originalHeight ? 'landscape' : 'portrait',
     unit: 'px',
-    format: [firstImg.width, firstImg.height]
+    format: [firstSlide.originalWidth, firstSlide.originalHeight]
   })
 
-  for (let i = 0; i < images.length; i++) {
-    const img = await loadImage(images[i])
+  for (let i = 0; i < slides.length; i++) {
+    const slide = slides[i]
+    const { originalWidth, originalHeight } = slide
 
     if (i > 0) {
-      pdf.addPage([img.width, img.height], img.width > img.height ? 'landscape' : 'portrait')
+      pdf.addPage(
+        [originalWidth, originalHeight],
+        originalWidth > originalHeight ? 'landscape' : 'portrait'
+      )
     }
 
-    pdf.addImage(images[i], 'PNG', 0, 0, img.width, img.height)
+    // 画像をオリジナルサイズに合わせて配置（アスペクト比を維持してフィット）
+    pdf.addImage(slide.imageDataUrl, 'PNG', 0, 0, originalWidth, originalHeight)
   }
 
   return pdf.output('blob')
-}
-
-function loadImage(dataUrl: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = reject
-    img.src = dataUrl
-  })
 }

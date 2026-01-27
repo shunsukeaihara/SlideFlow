@@ -13,7 +13,6 @@ interface PromptInputAreaProps {
   isSlideProcessing: boolean
   onOpenDrawer: () => void
   allReferences: ReferenceImage[]
-  hasOcrResult: boolean
 }
 
 export function PromptInputArea({
@@ -21,8 +20,7 @@ export function PromptInputArea({
   onEdit,
   isSlideProcessing,
   onOpenDrawer,
-  allReferences,
-  hasOcrResult
+  allReferences
 }: PromptInputAreaProps) {
   const {
     processingSlides,

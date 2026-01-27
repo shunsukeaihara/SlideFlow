@@ -6,6 +6,7 @@ import { useProjectStore } from '@/stores/projectStore'
 
 interface EditorHeaderProps {
   isSaving: boolean
+  isExporting: boolean
   onBack: () => void
   onSave: () => void
   onExportPdf: () => void
@@ -14,6 +15,7 @@ interface EditorHeaderProps {
 
 export function EditorHeader({
   isSaving,
+  isExporting,
   onBack,
   onSave,
   onExportPdf,
@@ -24,16 +26,9 @@ export function EditorHeader({
 
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
-  const [editName, setEditName] = useState(projectName)
+  const [localEditName, setLocalEditName] = useState('')
   const [isComposing, setIsComposing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-
-  // Update editName when projectName changes externally
-  useEffect(() => {
-    if (!isEditing) {
-      setEditName(projectName)
-    }
-  }, [projectName, isEditing])
 
   // Focus input when entering edit mode
   useEffect(() => {
@@ -49,22 +44,21 @@ export function EditorHeader({
   }
 
   const handleStartEdit = useCallback(() => {
-    setEditName(projectName)
+    setLocalEditName(projectName)
     setIsEditing(true)
   }, [projectName])
 
   const handleSaveName = useCallback(() => {
-    const trimmedName = editName.trim()
+    const trimmedName = localEditName.trim()
     if (trimmedName && trimmedName !== projectName) {
       updateProjectName(trimmedName)
     }
     setIsEditing(false)
-  }, [editName, projectName, updateProjectName])
+  }, [localEditName, projectName, updateProjectName])
 
   const handleCancelEdit = useCallback(() => {
-    setEditName(projectName)
     setIsEditing(false)
-  }, [projectName])
+  }, [])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -100,8 +94,8 @@ export function EditorHeader({
           <div className="flex items-center gap-1 min-w-0 flex-1 md:flex-none md:w-[70vw] md:max-w-xl">
             <Input
               ref={inputRef}
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
+              value={localEditName}
+              onChange={(e) => setLocalEditName(e.target.value)}
               onKeyDown={handleKeyDown}
               onBlur={handleBlur}
               onCompositionStart={() => setIsComposing(true)}
@@ -147,9 +141,18 @@ export function EditorHeader({
             </>
           )}
         </Button>
-        <Button variant="outline" size="sm" onClick={onExportPdf}>
-          <Download className="mr-2 h-4 w-4" />
-          PDF出力
+        <Button variant="outline" size="sm" onClick={onExportPdf} disabled={isExporting}>
+          {isExporting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              出力中...
+            </>
+          ) : (
+            <>
+              <Download className="mr-2 h-4 w-4" />
+              PDF出力
+            </>
+          )}
         </Button>
         <Button variant="ghost" size="icon" onClick={onOpenSettings}>
           <Settings className="h-5 w-5" />
@@ -189,10 +192,15 @@ export function EditorHeader({
               </button>
               <button
                 onClick={() => handleMenuAction(onExportPdf)}
-                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                disabled={isExporting}
+                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
               >
-                <Download className="h-4 w-4" />
-                PDF出力
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {isExporting ? '出力中...' : 'PDF出力'}
               </button>
               <div className="border-t border-gray-100 my-1" />
               <button
