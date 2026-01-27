@@ -1,23 +1,16 @@
-import { GoogleGenAI, type GenerateContentResponse } from '@google/genai'
-import type { OcrTextBlock } from '../types/project'
-
-let geminiClient: GoogleGenAI | null = null
-
-export function initializeGemini(apiKey: string): void {
-  if (apiKey) {
-    geminiClient = new GoogleGenAI({ apiKey })
-  }
-}
-
-export function isGeminiInitialized(): boolean {
-  return geminiClient !== null
-}
+import type { OcrTextBlock } from '@/types/project'
+import type {
+  ImageEditRequest,
+  ImageGenerateRequest,
+  ContentPart,
+  OcrContentMessage
+} from './types'
 
 // ============================================================================
 // Common Utilities
 // ============================================================================
 
-function dataUrlToBase64(dataUrl: string): { base64: string; mimeType: string } {
+export function dataUrlToBase64(dataUrl: string): { base64: string; mimeType: string } {
   const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
   if (!matches) {
     throw new Error('Invalid data URL')
@@ -28,41 +21,11 @@ function dataUrlToBase64(dataUrl: string): { base64: string; mimeType: string } 
   }
 }
 
-function ensureClient(): GoogleGenAI {
-  if (!geminiClient) {
-    throw new Error('Gemini client not initialized. Please set your API key.')
-  }
-  return geminiClient
-}
-
-function createClientWithApiKey(apiKey: string): GoogleGenAI {
-  if (!apiKey) {
-    throw new Error('API key is required')
-  }
-  return new GoogleGenAI({ apiKey })
-}
-
 // ============================================================================
-// Image Generation - Preprocessing
+// Image Generation - Prompt Builders
 // ============================================================================
 
-interface ImageEditRequest {
-  sourceImageDataUrl: string
-  prompt: string
-  basePrompt?: string
-  referenceImageDataUrls?: string[]
-  sourceImageSize?: { width: number; height: number }
-}
-
-interface ImageGenerateRequest {
-  prompt: string
-  basePrompt?: string
-  referenceImageDataUrls?: string[]
-}
-
-type ContentPart = { text: string } | { inlineData: { mimeType: string; data: string } }
-
-function buildEditImagePrompt(request: ImageEditRequest): string {
+export function buildEditImagePrompt(request: ImageEditRequest): string {
   const { prompt, basePrompt, referenceImageDataUrls, sourceImageSize } = request
 
   // Add size constraint for the output image
@@ -86,7 +49,7 @@ function buildEditImagePrompt(request: ImageEditRequest): string {
     : `${prompt}${imageRoleDescription}${sizeConstraint}`
 }
 
-function buildGenerateImagePrompt(request: ImageGenerateRequest): string {
+export function buildGenerateImagePrompt(request: ImageGenerateRequest): string {
   const { prompt, basePrompt, referenceImageDataUrls } = request
 
   let imageRoleDescription = ''
@@ -102,7 +65,7 @@ function buildGenerateImagePrompt(request: ImageGenerateRequest): string {
     : `${prompt}${imageRoleDescription}`
 }
 
-function buildImageContents(
+export function buildImageContents(
   fullPrompt: string,
   referenceImageDataUrls?: string[],
   sourceImageDataUrl?: string
@@ -137,93 +100,10 @@ function buildImageContents(
 }
 
 // ============================================================================
-// Image Generation - Postprocessing
+// OCR Refinement - Prompt Builders
 // ============================================================================
 
-function extractImageFromResponse(response: GenerateContentResponse): string {
-  const parts = response.candidates?.[0]?.content?.parts
-  if (!parts) {
-    throw new Error('No response from Gemini')
-  }
-
-  for (const part of parts) {
-    if (part.inlineData) {
-      const resultMimeType = part.inlineData.mimeType || 'image/png'
-      const resultBase64 = part.inlineData.data
-      return `data:${resultMimeType};base64,${resultBase64}`
-    }
-  }
-
-  throw new Error('No image in response. The model may have returned text only.')
-}
-
-// ============================================================================
-// Image Generation - Main Functions
-// ============================================================================
-
-export async function editImage(
-  sourceImageDataUrl: string,
-  prompt: string,
-  basePrompt?: string,
-  referenceImageDataUrls?: string[],
-  sourceImageSize?: { width: number; height: number }
-): Promise<string> {
-  const client = ensureClient()
-
-  const request: ImageEditRequest = {
-    sourceImageDataUrl,
-    prompt,
-    basePrompt,
-    referenceImageDataUrls,
-    sourceImageSize
-  }
-
-  const fullPrompt = buildEditImagePrompt(request)
-  const contents = buildImageContents(fullPrompt, referenceImageDataUrls, sourceImageDataUrl)
-
-  const response = await client.models.generateContent({
-    model: 'gemini-3-pro-image-preview',
-    contents,
-    config: {
-      responseModalities: ['Text', 'Image']
-    }
-  })
-
-  return extractImageFromResponse(response)
-}
-
-export async function generateImageFromReference(
-  prompt: string,
-  basePrompt?: string,
-  referenceImageDataUrls?: string[]
-): Promise<string> {
-  const client = ensureClient()
-
-  const request: ImageGenerateRequest = {
-    prompt,
-    basePrompt,
-    referenceImageDataUrls
-  }
-
-  const fullPrompt = buildGenerateImagePrompt(request)
-  const contents = buildImageContents(fullPrompt, referenceImageDataUrls)
-
-  const response = await client.models.generateContent({
-    model: 'gemini-3-pro-image-preview',
-    contents,
-    config: {
-      responseModalities: ['Text', 'Image']
-    }
-  })
-
-  return extractImageFromResponse(response)
-}
-
-// ============================================================================
-// OCR Refinement - Preprocessing
-// ============================================================================
-
-function buildOcrRefinementPrompt(tesseractBlocks: OcrTextBlock[]): string {
+export function buildOcrRefinementPrompt(tesseractBlocks: OcrTextBlock[]): string {
   return `以下は画像から抽出したOCR結果（Tesseract）のJSON配列です。
 OCR精度が低いので、画像を見ながら正確なテキストに修正してください。
 
@@ -254,10 +134,7 @@ ${JSON.stringify(tesseractBlocks, null, 2)}
 有効なテキストブロックのみを含むJSON配列形式で返してください。`
 }
 
-function buildOcrContents(
-  prompt: string,
-  imageDataUrl: string
-): Array<{ role: string; parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> }> {
+export function buildOcrContents(prompt: string, imageDataUrl: string): OcrContentMessage[] {
   const { base64, mimeType } = dataUrlToBase64(imageDataUrl)
 
   return [
@@ -277,10 +154,10 @@ function buildOcrContents(
 }
 
 // ============================================================================
-// OCR Refinement - Postprocessing
+// OCR Response Processing
 // ============================================================================
 
-function parseOcrResponse(text: string): OcrTextBlock[] {
+export function parseOcrResponse(text: string): OcrTextBlock[] {
   console.log('[Gemini] Raw JSON response:', text)
 
   const refinedBlocks = JSON.parse(text) as OcrTextBlock[]
@@ -293,7 +170,7 @@ function parseOcrResponse(text: string): OcrTextBlock[] {
   return refinedBlocks
 }
 
-function validateOcrBlocks(blocks: OcrTextBlock[]): OcrTextBlock[] {
+export function validateOcrBlocks(blocks: OcrTextBlock[]): OcrTextBlock[] {
   return blocks.filter((block) => {
     if (!block.text || !block.bbox) {
       console.warn('[Gemini] Skipping invalid block:', block)
@@ -307,7 +184,7 @@ function validateOcrBlocks(blocks: OcrTextBlock[]): OcrTextBlock[] {
   })
 }
 
-function synchronizeLineTexts(blocks: OcrTextBlock[]): OcrTextBlock[] {
+export function synchronizeLineTexts(blocks: OcrTextBlock[]): OcrTextBlock[] {
   return blocks.map((block) => {
     if (block.lines && block.lines.length > 0) {
       const refinedLineTexts = block.text.split('\n')
@@ -325,7 +202,7 @@ function synchronizeLineTexts(blocks: OcrTextBlock[]): OcrTextBlock[] {
   })
 }
 
-function processOcrResponse(text: string, originalBlockCount: number): OcrTextBlock[] {
+export function processOcrResponse(text: string, originalBlockCount: number): OcrTextBlock[] {
   const refinedBlocks = parseOcrResponse(text)
   const validBlocks = validateOcrBlocks(refinedBlocks)
   const updatedBlocks = synchronizeLineTexts(validBlocks)
@@ -333,39 +210,4 @@ function processOcrResponse(text: string, originalBlockCount: number): OcrTextBl
   console.log(`[Gemini] Refined ${originalBlockCount} blocks to ${updatedBlocks.length} valid blocks`)
 
   return updatedBlocks
-}
-
-// ============================================================================
-// OCR Refinement - Main Function
-// ============================================================================
-
-export async function refineTesseractResults(
-  tesseractBlocks: OcrTextBlock[],
-  imageDataUrl: string,
-  apiKey: string
-): Promise<OcrTextBlock[]> {
-  const client = createClientWithApiKey(apiKey)
-
-  const prompt = buildOcrRefinementPrompt(tesseractBlocks)
-  const contents = buildOcrContents(prompt, imageDataUrl)
-
-  try {
-    const response = await client.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
-      contents,
-      config: {
-        responseMimeType: 'application/json'
-      }
-    })
-
-    const text = response.text
-    if (!text) {
-      throw new Error('No response from Gemini')
-    }
-
-    return processOcrResponse(text, tesseractBlocks.length)
-  } catch (error) {
-    console.error('Gemini refinement error:', error)
-    throw new Error(`Gemini refinement failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-  }
 }

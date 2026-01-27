@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { GripHorizontal, PanelLeftOpen } from 'lucide-react'
 import { AddSlideDialog } from '@/components/AddSlideDialog'
 import { EditorHeader } from '@/components/editor/EditorHeader'
@@ -14,7 +13,9 @@ import { useProjectStore } from '@/stores/projectStore'
 import { useSlideEditorStore, type UploadedImage } from '@/stores/slideEditorStore'
 import { useImageOperations } from '@/hooks/useImageOperations'
 import { useReferenceImages } from '@/hooks/useReferenceImages'
-import { editImage, isGeminiInitialized, initializeGemini } from '@/lib/gemini'
+import { useAppRouter } from '@/hooks/useAppRouter'
+import { useGemini } from '@/context/GeminiContext'
+import { useShowApiKeyUI } from '@/hooks/useShowApiKeyUI'
 import { extractText } from '@/lib/ocr'
 import { createPdfFromImages } from '@/lib/pdf'
 import { saveProjectToZip, getProjectFileName } from '@/lib/projectFile'
@@ -24,7 +25,9 @@ import {
 } from '@/lib/referenceImageUtils'
 
 export function EditorPage() {
-  const navigate = useNavigate()
+  const router = useAppRouter()
+  const gemini = useGemini()
+  const showApiKeyUI = useShowApiKeyUI()
   const [isSaving, setIsSaving] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -44,7 +47,6 @@ export function EditorPage() {
   const {
     project,
     selectedSlideId,
-    appSettings,
     addEditHistory,
     revertToHistory,
     clearSlideOcrResult,
@@ -93,15 +95,9 @@ export function EditorPage() {
 
   useEffect(() => {
     if (!project) {
-      navigate('/')
+      router.push('/')
     }
-  }, [project, navigate])
-
-  useEffect(() => {
-    if (appSettings.apiKey && !isGeminiInitialized()) {
-      initializeGemini(appSettings.apiKey)
-    }
-  }, [appSettings.apiKey])
+  }, [project, router])
 
   // Close slide list sheet when screen becomes wide (md breakpoint = 768px)
   useEffect(() => {
@@ -131,8 +127,8 @@ export function EditorPage() {
   const selectedSlideImageData = getCurrentImageData(selectedSlide)
 
   const handleBack = useCallback(() => {
-    navigate('/')
-  }, [navigate])
+    router.push('/')
+  }, [router])
 
   const handleAddSlideBefore = useCallback((slideIndex: number) => {
     setAddSlideInsertIndex(slideIndex)
@@ -221,9 +217,14 @@ export function EditorPage() {
   const handleEdit = useCallback(async () => {
     if (!selectedSlide || !prompt.trim()) return
 
-    if (!isGeminiInitialized()) {
-      alert('APIキーが設定されていません。設定画面からAPIキーを設定してください。')
-      navigate('/settings')
+    if (!gemini.isInitialized()) {
+      // In server mode, this should not happen as Gemini is always initialized
+      if (showApiKeyUI) {
+        alert('APIキーが設定されていません。設定画面からAPIキーを設定してください。')
+        router.push('/settings')
+      } else {
+        alert('サーバーエラー: Gemini APIが初期化されていません。')
+      }
       return
     }
 
@@ -247,9 +248,9 @@ export function EditorPage() {
       let ocrResult = currentImageData.ocrCache
 
       // Run OCR if needed
-      if (needsOcr && appSettings.apiKey) {
+      if (needsOcr) {
         try {
-          ocrResult = await extractText(currentImageData.dataUrl, appSettings.apiKey, {
+          ocrResult = await extractText(currentImageData.dataUrl, gemini, {
             onProgress: (status) => updateSlideProcessingStatus(selectedSlide.id, status)
           })
           setSlideOcrResult(selectedSlide.id, ocrResult)
@@ -278,13 +279,13 @@ export function EditorPage() {
       // Extract reference image data URLs
       const referenceImageDataUrls = selectedReferences.map((ref) => ref.dataUrl)
 
-      const resultImageDataUrl = await editImage(
-        currentImageData.dataUrl,
-        fullPrompt,
-        project?.settings.basePrompt,
+      const resultImageDataUrl = await gemini.editImage({
+        sourceImageDataUrl: currentImageData.dataUrl,
+        prompt: fullPrompt,
+        basePrompt: project?.settings.basePrompt,
         referenceImageDataUrls,
-        { width: currentImageData.width, height: currentImageData.height }
-      )
+        sourceImageSize: { width: currentImageData.width, height: currentImageData.height }
+      })
 
       // Convert reference IDs to image data
       const { existingImageIds, newReferenceImages } = convertReferenceIdsToImageData(
@@ -311,9 +312,10 @@ export function EditorPage() {
     selectedSlide,
     prompt,
     project,
-    appSettings.apiKey,
+    gemini,
+    showApiKeyUI,
     addEditHistory,
-    navigate,
+    router,
     allReferences,
     selectedReferenceIds,
     includeOcrResult,
@@ -411,7 +413,7 @@ export function EditorPage() {
     }
 
     try {
-      const ocrResult = await extractText(currentImageData.dataUrl, appSettings.apiKey, {
+      const ocrResult = await extractText(currentImageData.dataUrl, gemini, {
         onProgress: (status) => updateSlideProcessingStatus(selectedSlide.id, status)
       })
       setSlideOcrResult(selectedSlide.id, ocrResult)
@@ -424,7 +426,7 @@ export function EditorPage() {
     }
   }, [
     selectedSlide,
-    appSettings.apiKey,
+    gemini,
     setSlideOcrResult,
     setSlideOcrVisibility,
     getCurrentImageData,
@@ -451,7 +453,7 @@ export function EditorPage() {
         onBack={handleBack}
         onSave={handleSaveProject}
         onExportPdf={handleExportPdf}
-        onOpenSettings={() => navigate('/settings')}
+        onOpenSettings={() => router.push('/settings')}
       />
 
       {/* Main Content */}

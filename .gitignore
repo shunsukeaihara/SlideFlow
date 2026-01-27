@@ -7,3 +7,9 @@ out
 *.pdf
 .yarn/
 .serena/
+
+# Next.js
+.next/
+next/.next/
+next/node_modules/
+next/.env.local

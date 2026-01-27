@@ -16,7 +16,7 @@ import { useProjectStore } from '@/stores/projectStore'
 import { useImageOperations } from '@/hooks/useImageOperations'
 import { useReferenceImages } from '@/hooks/useReferenceImages'
 import { useReferenceSelection } from '@/hooks/useReferenceSelection'
-import { generateImageFromReference, isGeminiInitialized } from '@/lib/gemini'
+import { useGemini } from '@/context/GeminiContext'
 import { convertReferenceIdsToImageData } from '@/lib/referenceImageUtils'
 import { getReferencesByIds, getReferenceById } from '@/lib/getReferenceById'
 import { cn } from '@/lib/utils'
@@ -29,6 +29,7 @@ interface AddSlideDialogProps {
 }
 
 export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDialogProps) {
+  const gemini = useGemini()
   const { project, addSlide } = useProjectStore()
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -62,7 +63,7 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
       return
     }
 
-    if (!isGeminiInitialized()) {
+    if (!gemini.isInitialized()) {
       alert('APIキーが設定されていません。設定画面からAPIキーを設定してください。')
       return
     }
@@ -92,20 +93,20 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
           alert('画像データが見つかりません。')
           return
         }
-        resultImageDataUrl = await generateImageFromReference(
-          `以下のプロンプトに基づいて新しいスライドを生成してください。元の画像は参考程度にしてください。\n\n${prompt}`,
-          project?.settings.basePrompt,
-          [firstImageData.dataUrl]
-        )
+        resultImageDataUrl = await gemini.generateImageFromReference({
+          prompt: `以下のプロンプトに基づいて新しいスライドを生成してください。元の画像は参考程度にしてください。\n\n${prompt}`,
+          basePrompt: project?.settings.basePrompt,
+          referenceImageDataUrls: [firstImageData.dataUrl]
+        })
       } else {
         // One or more reference images
         const referenceImageDataUrls = selectedReferences.map((ref) => ref.dataUrl)
 
-        resultImageDataUrl = await generateImageFromReference(
+        resultImageDataUrl = await gemini.generateImageFromReference({
           prompt,
-          project?.settings.basePrompt,
+          basePrompt: project?.settings.basePrompt,
           referenceImageDataUrls
-        )
+        })
       }
 
       // Get generated image dimensions
@@ -151,7 +152,8 @@ export function AddSlideDialog({ open, onOpenChange, insertIndex }: AddSlideDial
     addSlide,
     onOpenChange,
     getCurrentImageData,
-    resetSelection
+    resetSelection,
+    gemini
   ])
 
   const handleClose = useCallback(() => {

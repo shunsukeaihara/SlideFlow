@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useProjectStore } from '@/stores/projectStore'
+import { useGemini } from '@/context/GeminiContext'
 import { extractText } from '@/lib/ocr'
 import { Loader2, ScanText } from 'lucide-react'
 
@@ -14,8 +15,8 @@ export function OcrButton({ slideId, disabled }: OcrButtonProps) {
   const [status, setStatus] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
 
+  const gemini = useGemini()
   const project = useProjectStore((state) => state.project)
-  const apiKey = useProjectStore((state) => state.appSettings.apiKey)
   const setSlideOcrResult = useProjectStore((state) => state.setSlideOcrResult)
 
   const slide = project?.slides.find((s) => s.id === slideId)
@@ -29,7 +30,7 @@ export function OcrButton({ slideId, disabled }: OcrButtonProps) {
     setStatus('Tesseract実行中...')
 
     try {
-      const ocrResult = await extractText(currentImage.dataUrl, apiKey)
+      const ocrResult = await extractText(currentImage.dataUrl, gemini)
 
       setSlideOcrResult(slideId, ocrResult)
       setStatus('')

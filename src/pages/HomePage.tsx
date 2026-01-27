@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Upload, FolderOpen, Settings, Clock, Trash2, History, BookOpen, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useProjectStore } from '@/stores/projectStore'
+import { useAppRouter } from '@/hooks/useAppRouter'
+import { useShowApiKeyUI } from '@/hooks/useShowApiKeyUI'
 import { extractImagesFromPdf } from '@/lib/pdf'
 import { loadProjectFromZip } from '@/lib/projectFile'
 import { isOpfsSupported } from '@/lib/opfs'
 
 export function HomePage() {
-  const navigate = useNavigate()
+  const router = useAppRouter()
+  const showApiKeyUI = useShowApiKeyUI()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const projectInputRef = useRef<HTMLInputElement>(null)
   const [loadingMessage, setLoadingMessage] = useState('')
@@ -28,7 +30,8 @@ export function HomePage() {
     deleteFromOpfs
   } = useProjectStore()
 
-  const isApiKeyMissing = !appSettings.apiKey
+  // API Key warning only in client mode
+  const isApiKeyMissing = showApiKeyUI && !appSettings.apiKey
   const hasOpfsSupport = isOpfsSupported()
 
   // HomePageに来たらプロジェクトをクリア
@@ -64,7 +67,7 @@ export function HomePage() {
         const project = createProject(projectName, slides)
         setProject(project)
 
-        navigate('/editor')
+        router.push('/editor')
       } catch (error) {
         console.error('Failed to load PDF:', error)
         alert('PDFの読み込みに失敗しました。')
@@ -75,7 +78,7 @@ export function HomePage() {
         }
       }
     },
-    [createProject, navigate, setLoading, setProject]
+    [createProject, router, setLoading, setProject]
   )
 
   const handleProjectFileChange = useCallback(
@@ -89,7 +92,7 @@ export function HomePage() {
         const project = await loadProjectFromZip(file)
         setProject(project)
 
-        navigate('/editor')
+        router.push('/editor')
       } catch (error) {
         console.error('Failed to load project:', error)
         alert('プロジェクトファイルの読み込みに失敗しました。')
@@ -100,24 +103,24 @@ export function HomePage() {
         }
       }
     },
-    [navigate, setLoading, setProject]
+    [router, setLoading, setProject]
   )
 
   const handleOpenSettings = useCallback(() => {
-    navigate('/settings')
-  }, [navigate])
+    router.push('/settings')
+  }, [router])
 
   const handleOpenFromHistory = useCallback(
     async (projectId: string) => {
       setLoadingMessage('プロジェクトを読み込み中...')
       const success = await loadFromOpfs(projectId)
       if (success) {
-        navigate('/editor')
+        router.push('/editor')
       } else {
         alert('プロジェクトの読み込みに失敗しました。')
       }
     },
-    [loadFromOpfs, navigate]
+    [loadFromOpfs, router]
   )
 
   const handleDeleteFromHistory = useCallback(

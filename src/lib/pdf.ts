@@ -1,8 +1,10 @@
 import * as pdfjs from 'pdfjs-dist'
 
-// PDF.jsのワーカーを設定（Viteのアセットインポートを使用）
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker
+// PDF.js worker configuration
+// Use unpkg CDN for compatibility with both Vite and Next.js/Turbopack
+// Note: cdnjs doesn't have all versions, unpkg mirrors npm directly
+const PDFJS_VERSION = '5.4.530'
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`
 
 interface ExtractedImageData {
   imageDataUrl: string
