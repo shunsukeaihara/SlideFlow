@@ -1,6 +1,6 @@
 'use server'
 
-import { editImage as serverEditImage } from '../lib/gemini-server'
+import { editImage as serverEditImage } from '../lib/gemini'
 import type { ImageEditRequest } from '@/lib/gemini'
 
 export async function editImageAction(request: ImageEditRequest): Promise<string> {

@@ -7,11 +7,16 @@ const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployment
   output: 'standalone',
 
+  // Allow cross-origin requests from localhost/127.0.0.1 in development
+  allowedDevOrigins: ['http://127.0.0.1:3000', 'http://localhost:3000'],
+
   // Transpile shared src modules
   transpilePackages: [],
 
-  // Exclude pdfjs-dist from server-side bundling (Turbopack equivalent)
-  serverExternalPackages: ['pdfjs-dist'],
+  // Exclude packages from server-side bundling
+  // - pdfjs-dist: PDF rendering (client-side only)
+  // - sharp: Native image processing library
+  serverExternalPackages: ['pdfjs-dist', 'sharp'],
 
   // Remove console.log/warn in production builds
   compiler: {

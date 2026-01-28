@@ -20,5 +20,9 @@ export default defineConfig({
       '@': resolve(__dirname, 'src')
     }
   },
-  plugins: [react(), tailwindcss()]
+  plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    // Exclude jsquash packages from pre-bundling to allow WASM loading
+    exclude: ['@jsquash/jpeg', '@jsquash/png', '@jsquash/webp', '@jsquash/resize']
+  }
 })

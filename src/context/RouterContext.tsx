@@ -18,6 +18,7 @@ export interface AppRouter {
 
 const RouterContext = createContext<AppRouter | null>(null)
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAppRouter(): AppRouter {
   const ctx = useContext(RouterContext)
   if (!ctx) {

@@ -12,6 +12,7 @@ import {
   processOcrResponse,
   systemInstruction
 } from '@/lib/gemini'
+import { processGeminiImage } from './imageProcessing'
 
 // ============================================================================
 // Server-Side Client Management
@@ -29,7 +30,7 @@ function getClient(): GoogleGenAI {
 // Response Processing
 // ============================================================================
 
-function extractImageFromResponse(response: GenerateContentResponse): string {
+async function extractImageFromResponse(response: GenerateContentResponse): Promise<string> {
   const parts = response.candidates?.[0]?.content?.parts
   if (!parts) {
     throw new Error('No response from Gemini')
@@ -38,8 +39,9 @@ function extractImageFromResponse(response: GenerateContentResponse): string {
   for (const part of parts) {
     if (part.inlineData) {
       const resultMimeType = part.inlineData.mimeType || 'image/png'
-      const resultBase64 = part.inlineData.data
-      return `data:${resultMimeType};base64,${resultBase64}`
+      const resultBase64 = part.inlineData.data!
+      // Process: resize to max 1376x768, convert to WebP
+      return processGeminiImage(resultBase64, resultMimeType)
     }
   }
 
@@ -70,7 +72,7 @@ export async function editImage(request: ImageEditRequest): Promise<string> {
     }
   })
 
-  return extractImageFromResponse(response)
+  return await extractImageFromResponse(response)
 }
 
 export async function generateImageFromReference(request: ImageGenerateRequest): Promise<string> {
@@ -89,7 +91,7 @@ export async function generateImageFromReference(request: ImageGenerateRequest):
     }
   })
 
-  return extractImageFromResponse(response)
+  return await extractImageFromResponse(response)
 }
 
 export async function refineTesseractResults(

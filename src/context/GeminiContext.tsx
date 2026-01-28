@@ -24,6 +24,7 @@ export interface GeminiAPI {
 
 const GeminiContext = createContext<GeminiAPI | null>(null)
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useGemini(): GeminiAPI {
   const ctx = useContext(GeminiContext)
   if (!ctx) {
