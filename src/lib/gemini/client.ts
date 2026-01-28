@@ -7,7 +7,8 @@ import {
   buildImageContents,
   buildOcrRefinementPrompt,
   buildOcrContents,
-  processOcrResponse
+  processOcrResponse,
+  systemInstruction
 } from './prompts'
 
 // ============================================================================
@@ -74,31 +75,21 @@ function extractImageFromResponse(response: GenerateContentResponse): string {
 // Image Generation - Main Functions
 // ============================================================================
 
-export async function editImage(
-  sourceImageDataUrl: string,
-  prompt: string,
-  basePrompt?: string,
-  referenceImageDataUrls?: string[],
-  sourceImageSize?: { width: number; height: number }
-): Promise<string> {
+export async function editImage(request: ImageEditRequest): Promise<string> {
   const client = ensureClient()
 
-  const request: ImageEditRequest = {
-    sourceImageDataUrl,
-    prompt,
-    basePrompt,
-    referenceImageDataUrls,
-    sourceImageSize
-  }
+  const { referenceImageDataUrls, sourceImageDataUrl } = request
 
   const fullPrompt = buildEditImagePrompt(request)
   const contents = buildImageContents(fullPrompt, referenceImageDataUrls, sourceImageDataUrl)
 
   const response = await client.models.generateContent({
     model: 'gemini-3-pro-image-preview',
-    contents,
+    contents: [{ role: 'user', parts: contents }],
     config: {
-      responseModalities: ['Text', 'Image']
+      responseModalities: ['Text', 'Image'],
+      systemInstruction: systemInstruction,
+      imageConfig: { aspectRatio: '16:9', imageSize: '2K' }
     }
   })
   console.log('Gemini editImage response:', response)
@@ -125,7 +116,9 @@ export async function generateImageFromReference(
     model: 'gemini-3-pro-image-preview',
     contents,
     config: {
-      responseModalities: ['Text', 'Image']
+      responseModalities: ['Text', 'Image'],
+      systemInstruction: systemInstruction,
+      imageConfig: { aspectRatio: '16:9', imageSize: '2K' }
     }
   })
 

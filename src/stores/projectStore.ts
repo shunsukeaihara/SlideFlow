@@ -187,8 +187,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       order: getNextImageOrder(project.images),
       dataUrl: entry.resultImageDataUrl,
       fileType: getFileTypeFromDataUrl(entry.resultImageDataUrl),
-      width: currentImage.width,
-      height: currentImage.height
+      width: 1376,
+      height: 768
       // No ocrCache - it's a new image
     }
 

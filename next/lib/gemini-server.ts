@@ -9,7 +9,8 @@ import {
   buildImageContents,
   buildOcrRefinementPrompt,
   buildOcrContents,
-  processOcrResponse
+  processOcrResponse,
+  systemInstruction
 } from '@/lib/gemini'
 
 // ============================================================================
@@ -63,7 +64,9 @@ export async function editImage(request: ImageEditRequest): Promise<string> {
     model: 'gemini-3-pro-image-preview',
     contents,
     config: {
-      responseModalities: ['Text', 'Image']
+      responseModalities: ['Text', 'Image'],
+      systemInstruction: systemInstruction,
+      imageConfig: { aspectRatio: '16:9', imageSize: '2K' }
     }
   })
 
@@ -80,7 +83,9 @@ export async function generateImageFromReference(request: ImageGenerateRequest):
     model: 'gemini-3-pro-image-preview',
     contents,
     config: {
-      responseModalities: ['Text', 'Image']
+      responseModalities: ['Text', 'Image'],
+      systemInstruction: systemInstruction,
+      imageConfig: { aspectRatio: '16:9', imageSize: '2K' }
     }
   })
 

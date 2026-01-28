@@ -262,26 +262,16 @@ export function EditorPage() {
 
       const selectedReferences = allReferences.filter((ref) => selectedReferenceIds.has(ref.id))
 
-      // Build full prompt with OCR result if enabled
-      let fullPrompt = prompt
-
-      // Include OCR result if enabled and available
-      if (includeOcrResult && ocrResult) {
-        const ocrText = ocrResult.fullText
-        if (ocrText) {
-          fullPrompt = `${fullPrompt}\n\n【現在のスライドのテキスト内容(不完全に付き画像からも認識してください。)】\n${ocrText}`
-        }
-      }
-
       // Extract reference image data URLs
       const referenceImageDataUrls = selectedReferences.map((ref) => ref.dataUrl)
 
       const resultImageDataUrl = await gemini.editImage({
         sourceImageDataUrl: currentImageData.dataUrl,
-        prompt: fullPrompt,
+        prompt,
         basePrompt: project?.settings.basePrompt,
         referenceImageDataUrls,
-        sourceImageSize: { width: currentImageData.width, height: currentImageData.height }
+        sourceImageSize: { width: currentImageData.width, height: currentImageData.height },
+        ocrResult: includeOcrResult ? ocrResult : undefined
       })
 
       // Convert reference IDs to image data
@@ -496,7 +486,9 @@ export function EditorPage() {
               slideNumber={selectedSlide.pageNumber}
               imageData={selectedSlideImageData}
               showOcrOverlay={selectedSlide.showOcrOverlay ?? true}
-              onToggleOcrOverlay={() => setSlideOcrVisibility(selectedSlide.id, !(selectedSlide.showOcrOverlay ?? true))}
+              onToggleOcrOverlay={() =>
+                setSlideOcrVisibility(selectedSlide.id, !(selectedSlide.showOcrOverlay ?? true))
+              }
               onExecuteOcr={handleOcrExecute}
               onClearOcr={() => clearSlideOcrResult(selectedSlide.id)}
             />

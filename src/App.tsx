@@ -61,13 +61,7 @@ function App(): React.JSX.Element {
   const clientGeminiAPI: GeminiAPI = useMemo(
     () => ({
       editImage: async (request: ImageEditRequest) => {
-        return clientEditImage(
-          request.sourceImageDataUrl,
-          request.prompt,
-          request.basePrompt,
-          request.referenceImageDataUrls,
-          request.sourceImageSize
-        )
+        return clientEditImage(request)
       },
       generateImageFromReference: async (request: ImageGenerateRequest) => {
         return clientGenerateImageFromReference(

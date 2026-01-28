@@ -1,4 +1,4 @@
-import type { OcrTextBlock } from '@/types/project'
+import type { OcrTextBlock, OcrResult } from '@/types/project'
 
 // ============================================================================
 // Request/Response Types for Gemini API
@@ -10,6 +10,7 @@ export interface ImageEditRequest {
   basePrompt?: string
   referenceImageDataUrls?: string[]
   sourceImageSize?: { width: number; height: number }
+  ocrResult?: OcrResult
 }
 
 export interface ImageGenerateRequest {

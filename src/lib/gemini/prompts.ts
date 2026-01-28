@@ -1,4 +1,4 @@
-import type { OcrTextBlock } from '@/types/project'
+import type { OcrTextBlock, OcrResult } from '@/types/project'
 import type {
   ImageEditRequest,
   ImageGenerateRequest,
@@ -21,6 +21,9 @@ export function dataUrlToBase64(dataUrl: string): { base64: string; mimeType: st
   }
 }
 
+export const systemInstruction =
+  'あなたはプレゼンテーションスライドを画像として生成する優秀なAIアシスタントです。参考画像とユーザーの指示を基に、高品質なスライド画像を生成してください。'
+
 // ============================================================================
 // Prompt Templates
 // ============================================================================
@@ -31,33 +34,31 @@ export function dataUrlToBase64(dataUrl: string): { base64: string; mimeType: st
  * - {{basePrompt}}: User-defined base prompt (system instruction)
  * - {{prompt}}: User's edit instruction for this specific edit
  * - {{imageRoleDescription}}: Description of each image's role
- * - {{sizeConstraint}}: Output size constraint instruction
+ * - {{ocrText}}: OCR text extracted from the source image (optional)
  */
-export const EDIT_IMAGE_TEMPLATE = `以下の指示に従って、画像を編集してください。
-
-[基本的な指示]
-ここに記載された指示は、後段の画像編集に関する指示に劣後する指示です。
-コンフリクトする場合は、画像編集に関する指示を優先してください。
-編集対象の画像の内容については編集指示に従い、指定されていない部分は元の状態を維持してください。
-テキスト部分については、編集対象の元の情報をテキストとして読み取りつつ、編集指示がない限りはテキスト情報を元に再生成してください。
-右下のnotebookLMという文字やロゴは削除してください。
-
-[画像編集に関する指示]
+export const EDIT_IMAGE_TEMPLATE = `# 画像編集に関する指示
 
 {{basePrompt}}
 {{prompt}}
- 
-[画像の役割についての説明]
+
+# 画像の役割についての説明
 
 {{imageRoleDescription}}
 
-[出力画像に関する制約]
+{{ocrText}}
+`
 
-プレゼンテーション資料に用います。
-【重要】文字が潰れたり読みにくくならないように注意してください。
-・文字はベクター的にシャープに再現してください
-・文字の縁取り・にじみを発生させないでください
-【重要】最終出力は1834x1024ですが、内部的には4K相当の精細度で描画してください。縮小を前提に高密度で生成してください。`
+/**
+ * Template for OCR text section.
+ * Placeholders:
+ * - {{ocrContent}}: The actual OCR text content
+ */
+export const OCR_TEXT_TEMPLATE = `
+[現在のスライドのテキスト内容]
+以下はOCRで読み取ったテキストです。不完全な場合があるため、画像からもテキスト内容を認識してください。
+
+{{ocrContent}}
+`
 
 /**
  * Template for image generation prompts.
@@ -66,28 +67,16 @@ export const EDIT_IMAGE_TEMPLATE = `以下の指示に従って、画像を編�
  * - {{prompt}}: User's generation instruction
  * - {{imageRoleDescription}}: Description of reference images' roles
  */
-export const GENERATE_IMAGE_TEMPLATE = `以下の指示に従って、画像を生成してください。
-[基本的な指示]
-ここに記載された指示は、後段の画像生成に関する指示に劣後する指示です。
-コンフリクトする場合は、画像生成に関する指示を優先してください。
-参照画像などに含まれる右下のnotebookLMという文字やロゴは無視して生成しないでください。
-
-【画像生成に関する指示】
+export const GENERATE_IMAGE_TEMPLATE = `# 画像生成に関する指示
 
 {{basePrompt}}
 {{prompt}}
 
-【画像の役割についての説明】
+# 画像の役割についての説明
 
 {{imageRoleDescription}}
 
-【出力画像に関する制約】
-
-プレゼンテーション資料に用います。
-【重要】文字が潰れたり読みにくくならないように注意してください。
-・文字はベクター的にシャープに再現してください
-・文字の縁取り・にじみを発生させないでください
-【重要】最終出力は1834x1024ですが、内部的には4K相当の精細度で描画してください。縮小を前提に高密度で生成してください。`
+`
 
 /**
  * Template for image role description when editing with reference images.
@@ -157,19 +146,32 @@ function cleanFilledTemplate(text: string): string {
 }
 
 // ============================================================================
+// OCR Processing
+// ============================================================================
+
+/**
+ * Convert OcrResult to formatted text for prompt inclusion.
+ * Formats text blocks with position information for better context.
+ */
+function formatOcrResultForPrompt(ocrResult: OcrResult): string {
+  if (!ocrResult.textBlocks || ocrResult.textBlocks.length === 0) {
+    return ''
+  }
+
+  // Use fullText if available, otherwise concatenate text blocks
+  if (ocrResult.fullText) {
+    return ocrResult.fullText
+  }
+
+  return ocrResult.textBlocks.map((block) => block.text).join('\n')
+}
+
+// ============================================================================
 // Image Generation - Prompt Builders
 // ============================================================================
 
 export function buildEditImagePrompt(request: ImageEditRequest): string {
-  const { prompt, basePrompt, referenceImageDataUrls, sourceImageSize } = request
-
-  // Build size constraint
-  const sizeConstraint = sourceImageSize
-    ? fillTemplate(SIZE_CONSTRAINT_WITH_DIMENSIONS_TEMPLATE, {
-        width: sourceImageSize.width,
-        height: sourceImageSize.height
-      })
-    : SIZE_CONSTRAINT_NO_DIMENSIONS_TEMPLATE
+  const { prompt, basePrompt, referenceImageDataUrls, ocrResult } = request
 
   // Build image role description
   let imageRoleDescription: string
@@ -185,12 +187,21 @@ export function buildEditImagePrompt(request: ImageEditRequest): string {
     imageRoleDescription = EDIT_IMAGE_ROLE_NO_REFERENCES_TEMPLATE
   }
 
+  // Build OCR text section if available
+  let ocrTextSection = ''
+  if (ocrResult) {
+    const ocrContent = formatOcrResultForPrompt(ocrResult)
+    if (ocrContent) {
+      ocrTextSection = fillTemplate(OCR_TEXT_TEMPLATE, { ocrContent })
+    }
+  }
+
   // Fill main template
   const filledTemplate = fillTemplate(EDIT_IMAGE_TEMPLATE, {
     basePrompt: basePrompt || '',
     prompt,
     imageRoleDescription,
-    sizeConstraint
+    ocrText: ocrTextSection
   })
 
   const ret = cleanFilledTemplate(filledTemplate)
