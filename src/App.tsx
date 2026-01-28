@@ -46,14 +46,11 @@ function AppRoutes(): React.JSX.Element {
 }
 
 function App(): React.JSX.Element {
-  const { loadApiKey, appSettings } = useProjectStore()
-
-  // 起動時にAPIキーを読み込む
-  useEffect(() => {
-    loadApiKey()
-  }, [loadApiKey])
+  const { appSettings } = useProjectStore()
 
   // APIキーが変更されたらGemini初期化
+  // Note: appSettings.apiKey is initialized synchronously from localStorage in the store,
+  // so this will run on first render if an API key exists
   useEffect(() => {
     if (appSettings.apiKey) {
       initializeGemini(appSettings.apiKey)

@@ -92,8 +92,17 @@ interface ProjectState {
   deleteFromOpfs: (projectId: string) => Promise<void>
 }
 
+// Initialize API key synchronously from localStorage (Vite mode only)
+// This ensures the API key is available immediately on app start
+function getInitialApiKey(): string {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('slideflow-api-key') || ''
+  }
+  return ''
+}
+
 const defaultAppSettings: AppSettings = {
-  apiKey: ''
+  apiKey: getInitialApiKey()
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({

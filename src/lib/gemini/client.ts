@@ -16,6 +16,15 @@ import {
 
 let geminiClient: GoogleGenAI | null = null
 
+// Initialize from localStorage on module load (Vite mode only)
+// This ensures the client is ready before any React effects run
+if (typeof window !== 'undefined') {
+  const storedApiKey = localStorage.getItem('slideflow-api-key')
+  if (storedApiKey) {
+    geminiClient = new GoogleGenAI({ apiKey: storedApiKey })
+  }
+}
+
 export function initializeGemini(apiKey: string): void {
   if (apiKey) {
     geminiClient = new GoogleGenAI({ apiKey })
@@ -92,7 +101,7 @@ export async function editImage(
       responseModalities: ['Text', 'Image']
     }
   })
-
+  console.log('Gemini editImage response:', response)
   return extractImageFromResponse(response)
 }
 

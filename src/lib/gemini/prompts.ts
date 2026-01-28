@@ -22,47 +22,199 @@ export function dataUrlToBase64(dataUrl: string): { base64: string; mimeType: st
 }
 
 // ============================================================================
+// Prompt Templates
+// ============================================================================
+
+/**
+ * Template for image editing prompts.
+ * Placeholders:
+ * - {{basePrompt}}: User-defined base prompt (system instruction)
+ * - {{prompt}}: User's edit instruction for this specific edit
+ * - {{imageRoleDescription}}: Description of each image's role
+ * - {{sizeConstraint}}: Output size constraint instruction
+ */
+export const EDIT_IMAGE_TEMPLATE = `以下の指示に従って、画像を編集してください。
+
+[基本的な指示]
+ここに記載された指示は、後段の画像編集に関する指示に劣後する指示です。
+コンフリクトする場合は、画像編集に関する指示を優先してください。
+編集対象の画像の内容については編集指示に従い、指定されていない部分は元の状態を維持してください。
+テキスト部分については、編集対象の元の情報をテキストとして読み取りつつ、編集指示がない限りはテキスト情報を元に再生成してください。
+右下のnotebookLMという文字やロゴは削除してください。
+
+[画像編集に関する指示]
+
+{{basePrompt}}
+{{prompt}}
+ 
+[画像の役割についての説明]
+
+{{imageRoleDescription}}
+
+[出力画像に関する制約]
+
+プレゼンテーション資料に用います。
+【重要】文字が潰れたり読みにくくならないように注意してください。
+・文字はベクター的にシャープに再現してください
+・文字の縁取り・にじみを発生させないでください
+【重要】最終出力は1834x1024ですが、内部的には4K相当の精細度で描画してください。縮小を前提に高密度で生成してください。`
+
+/**
+ * Template for image generation prompts.
+ * Placeholders:
+ * - {{basePrompt}}: User-defined base prompt (system instruction)
+ * - {{prompt}}: User's generation instruction
+ * - {{imageRoleDescription}}: Description of reference images' roles
+ */
+export const GENERATE_IMAGE_TEMPLATE = `以下の指示に従って、画像を生成してください。
+[基本的な指示]
+ここに記載された指示は、後段の画像生成に関する指示に劣後する指示です。
+コンフリクトする場合は、画像生成に関する指示を優先してください。
+参照画像などに含まれる右下のnotebookLMという文字やロゴは無視して生成しないでください。
+
+【画像生成に関する指示】
+
+{{basePrompt}}
+{{prompt}}
+
+【画像の役割についての説明】
+
+{{imageRoleDescription}}
+
+【出力画像に関する制約】
+
+プレゼンテーション資料に用います。
+【重要】最終出力は1834x1024ですが、内部的には4K相当の精細度で描画してください。縮小を前提に高密度で生成してください。`
+
+/**
+ * Template for image role description when editing with reference images.
+ * Placeholders:
+ * - {{referenceImageDescriptions}}: List of reference image descriptions
+ * - {{targetImageIndex}}: Index of the target image (1-based)
+ */
+export const EDIT_IMAGE_ROLE_WITH_REFERENCES_TEMPLATE = `
+{{referenceImageDescriptions}}
+{{targetImageIndex}}枚目の画像: 編集対象の画像です。スタイル変更の指示がない限り、この画像の背景色やスタイルを維持しつつ、指示に従って編集してください。`
+
+/**
+ * Template for image role description when editing without reference images.
+ */
+export const EDIT_IMAGE_ROLE_NO_REFERENCES_TEMPLATE = `1枚目の画像: 編集対象の画像です。スタイル変更の指示がない限り、この画像の背景色やスタイルを維持しつつ、指示に従って編集してください。`
+
+/**
+ * Template for reference image description (used for each reference image).
+ * Placeholders:
+ * - {{index}}: Image index (1-based)
+ */
+export const REFERENCE_IMAGE_DESCRIPTION_TEMPLATE = `{{index}}枚目の画像: 参照画像です。スタイルや内容を参考にしてください。`
+
+/**
+ * Template for reference image description in generation mode.
+ * Placeholders:
+ * - {{index}}: Image index (1-based)
+ */
+export const GENERATE_REFERENCE_IMAGE_DESCRIPTION_TEMPLATE = `{{index}}枚目の画像: 参照画像です。スタイルや内容を参考にして新しい画像を生成してください。`
+
+/**
+ * Template for size constraint with specific dimensions.
+ * Placeholders:
+ * - {{width}}: Image width in pixels
+ * - {{height}}: Image height in pixels
+ */
+export const SIZE_CONSTRAINT_WITH_DIMENSIONS_TEMPLATE = `【重要】出力画像は編集対象画像と同じサイズ（{{width}}x{{height}}ピクセル）およびアスペクト比を維持してください。参照画像のサイズやアスペクト比に影響されないでください。`
+
+/**
+ * Template for size constraint without specific dimensions.
+ */
+export const SIZE_CONSTRAINT_NO_DIMENSIONS_TEMPLATE = `【重要】出力画像は編集対象画像と同じサイズおよびアスペクト比を維持してください。参照画像のサイズやアスペクト比に影響されないでください。`
+
+// ============================================================================
+// Template Utilities
+// ============================================================================
+
+/**
+ * Replace placeholders in a template string with provided values.
+ * Placeholders are in the format {{key}}.
+ */
+export function fillTemplate(template: string, values: Record<string, string | number>): string {
+  let result = template
+  for (const [key, value] of Object.entries(values)) {
+    result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value))
+  }
+  return result
+}
+
+/**
+ * Clean up a filled template by removing empty sections and normalizing whitespace.
+ */
+function cleanFilledTemplate(text: string): string {
+  return text
+    .replace(/\n{3,}/g, '\n\n') // Normalize multiple newlines
+    .trim()
+}
+
+// ============================================================================
 // Image Generation - Prompt Builders
 // ============================================================================
 
 export function buildEditImagePrompt(request: ImageEditRequest): string {
   const { prompt, basePrompt, referenceImageDataUrls, sourceImageSize } = request
 
-  // Add size constraint for the output image
+  // Build size constraint
   const sizeConstraint = sourceImageSize
-    ? `\n\n【重要】出力画像は編集対象画像と同じサイズ（${sourceImageSize.width}x${sourceImageSize.height}ピクセル）およびアスペクト比を維持してください。参照画像のサイズやアスペクト比に影響されないでください。`
-    : '\n\n【重要】出力画像は編集対象画像と同じサイズおよびアスペクト比を維持してください。参照画像のサイズやアスペクト比に影響されないでください。'
+    ? fillTemplate(SIZE_CONSTRAINT_WITH_DIMENSIONS_TEMPLATE, {
+        width: sourceImageSize.width,
+        height: sourceImageSize.height
+      })
+    : SIZE_CONSTRAINT_NO_DIMENSIONS_TEMPLATE
 
-  let imageRoleDescription = ''
+  // Build image role description
+  let imageRoleDescription: string
   if (referenceImageDataUrls && referenceImageDataUrls.length > 0) {
-    imageRoleDescription = `\n\n【画像の説明】\n`
-    for (let i = 0; i < referenceImageDataUrls.length; i++) {
-      imageRoleDescription += `${i + 1}枚目の画像: 参照画像です。スタイルや内容を参考にしてください。\n`
-    }
-    imageRoleDescription += `${referenceImageDataUrls.length + 1}枚目の画像: 編集対象の画像です。指定された内容に従ってこの画像を編集してください。指定されていない部分は絶対に変更しないでください。\n`
+    const referenceDescriptions = referenceImageDataUrls
+      .map((_, i) => fillTemplate(REFERENCE_IMAGE_DESCRIPTION_TEMPLATE, { index: i + 1 }))
+      .join('\n')
+    imageRoleDescription = fillTemplate(EDIT_IMAGE_ROLE_WITH_REFERENCES_TEMPLATE, {
+      referenceImageDescriptions: referenceDescriptions,
+      targetImageIndex: referenceImageDataUrls.length + 1
+    })
   } else {
-    imageRoleDescription = `\n\n【画像の説明】\n1枚目の画像: 編集対象の画像です。指定された内容に従ってこの画像を編集してください。指定されていない部分は絶対に変更しないでください。\n`
+    imageRoleDescription = EDIT_IMAGE_ROLE_NO_REFERENCES_TEMPLATE
   }
 
-  return basePrompt
-    ? `${basePrompt}\n\n${prompt}${imageRoleDescription}${sizeConstraint}`
-    : `${prompt}${imageRoleDescription}${sizeConstraint}`
+  // Fill main template
+  const filledTemplate = fillTemplate(EDIT_IMAGE_TEMPLATE, {
+    basePrompt: basePrompt || '',
+    prompt,
+    imageRoleDescription,
+    sizeConstraint
+  })
+
+  const ret = cleanFilledTemplate(filledTemplate)
+  console.log(ret)
+  return ret
 }
 
 export function buildGenerateImagePrompt(request: ImageGenerateRequest): string {
   const { prompt, basePrompt, referenceImageDataUrls } = request
 
+  // Build image role description
   let imageRoleDescription = ''
   if (referenceImageDataUrls && referenceImageDataUrls.length > 0) {
-    imageRoleDescription = `\n\n【画像の説明】\n`
-    for (let i = 0; i < referenceImageDataUrls.length; i++) {
-      imageRoleDescription += `${i + 1}枚目の画像: 参照画像です。スタイルや内容を参考にして新しい画像を生成してください。\n`
-    }
+    const referenceDescriptions = referenceImageDataUrls
+      .map((_, i) => fillTemplate(GENERATE_REFERENCE_IMAGE_DESCRIPTION_TEMPLATE, { index: i + 1 }))
+      .join('\n')
+    imageRoleDescription = `[画像の説明]\n${referenceDescriptions}`
   }
 
-  return basePrompt
-    ? `${basePrompt}\n\n${prompt}${imageRoleDescription}`
-    : `${prompt}${imageRoleDescription}`
+  // Fill main template
+  const filledTemplate = fillTemplate(GENERATE_IMAGE_TEMPLATE, {
+    basePrompt: basePrompt || '',
+    prompt,
+    imageRoleDescription
+  })
+  console.log(filledTemplate)
+  return cleanFilledTemplate(filledTemplate)
 }
 
 export function buildImageContents(
@@ -207,7 +359,9 @@ export function processOcrResponse(text: string, originalBlockCount: number): Oc
   const validBlocks = validateOcrBlocks(refinedBlocks)
   const updatedBlocks = synchronizeLineTexts(validBlocks)
 
-  console.log(`[Gemini] Refined ${originalBlockCount} blocks to ${updatedBlocks.length} valid blocks`)
+  console.log(
+    `[Gemini] Refined ${originalBlockCount} blocks to ${updatedBlocks.length} valid blocks`
+  )
 
   return updatedBlocks
 }

@@ -19,10 +19,7 @@ import { useShowApiKeyUI } from '@/hooks/useShowApiKeyUI'
 import { extractText } from '@/lib/ocr'
 import { createPdfFromImages } from '@/lib/pdf'
 import { saveProjectToZip, getProjectFileName } from '@/lib/projectFile'
-import {
-  convertReferenceIdsToImageData,
-  buildPromptWithReferences
-} from '@/lib/referenceImageUtils'
+import { convertReferenceIdsToImageData } from '@/lib/referenceImageUtils'
 
 export function EditorPage() {
   const router = useAppRouter()
@@ -265,8 +262,8 @@ export function EditorPage() {
 
       const selectedReferences = allReferences.filter((ref) => selectedReferenceIds.has(ref.id))
 
-      // Build full prompt with references and OCR result
-      let fullPrompt = buildPromptWithReferences(prompt, selectedReferences)
+      // Build full prompt with OCR result if enabled
+      let fullPrompt = prompt
 
       // Include OCR result if enabled and available
       if (includeOcrResult && ocrResult) {
