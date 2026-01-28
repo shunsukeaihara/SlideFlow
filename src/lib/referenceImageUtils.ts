@@ -62,21 +62,3 @@ export function convertReferenceIdsToImageData(
     newReferenceImages
   }
 }
-
-/**
- * Build full prompt with reference image descriptions
- */
-export function buildPromptWithReferences(
-  prompt: string,
-  selectedReferences: ReferenceImage[]
-): string {
-  if (selectedReferences.length === 0) {
-    return prompt
-  }
-
-  const refDescription = selectedReferences
-    .map((ref, i) => `参照画像${i + 1}: ${ref.name}`)
-    .join('\n')
-
-  return `${prompt}\n\n【参照画像】\n${refDescription}\n\n上記の参照画像のスタイルや内容を参考にして編集してください。`
-}

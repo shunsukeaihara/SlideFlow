@@ -9,7 +9,7 @@ export async function extractTextWithTesseract(dataUrl: string): Promise<OcrText
     console.log('[Tesseract] Creating worker...')
     worker = await createWorker('jpn+eng', undefined, {
       logger: (m) => {
-        console.log('[Tesseract]', m)
+        console.debug('[Tesseract]', m)
       }
     })
 
@@ -29,7 +29,7 @@ export async function extractTextWithTesseract(dataUrl: string): Promise<OcrText
       { blocks: true } // This is crucial for getting bounding boxes
     )
 
-    console.log('[Tesseract] Recognition result:', result)
+    console.debug('[Tesseract] Recognition result:', result)
 
     // Extract paragraphs with bounding boxes from blocks structure
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

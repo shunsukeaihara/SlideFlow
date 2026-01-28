@@ -4,7 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SlideFlow is a client-side web application for editing NotebookLM-generated slide PDFs using Google's Gemini AI. The app runs entirely in the browser with no backend - data is only sent to the Gemini API for image generation.
+SlideFlow is a web application for editing NotebookLM-generated slide PDFs using Google's Gemini AI. It supports two deployment modes from a single codebase:
+
+1. **Vite SPA Mode** - Static deployment, client-side Gemini API calls (user provides API key)
+2. **Next.js Server Mode** - Server-side Gemini API calls via Server Actions (API key from environment)
 
 ## Development Commands
 
@@ -12,24 +15,122 @@ SlideFlow is a client-side web application for editing NotebookLM-generated slid
 # Install dependencies (requires Node.js 22.x, Yarn 4.x)
 yarn install
 
-# Start development server (http://localhost:5173)
-yarn dev
+# ============================================================================
+# Vite SPA Mode (client-side API calls)
+# ============================================================================
+yarn dev          # Development server (http://localhost:5173)
+yarn build        # Production build (outputs to dist/)
+yarn preview      # Preview production build
 
-# Type checking (run before committing)
-yarn typecheck
+# ============================================================================
+# Next.js Server Mode (server-side API calls via Server Actions)
+# ============================================================================
+yarn dev:next     # Development server (http://localhost:3000)
+yarn build:next   # Production build (outputs to next/.next/)
+yarn start        # Start production server
 
-# Linting
-yarn lint
-
-# Format code
-yarn format
-
-# Production build (outputs to dist/)
-yarn build
-
-# Preview production build
-yarn preview
+# ============================================================================
+# Common
+# ============================================================================
+yarn typecheck       # Type check Vite app
+yarn typecheck:next  # Type check Next.js app
+yarn lint            # Linting
+yarn format          # Format code
 ```
+
+## Docker Deployment (Next.js Server Mode)
+
+```bash
+# Build Docker image
+docker build -t slideflow-next -f next/Dockerfile .
+
+# Run with API key
+docker run -p 3000:3000 -e GEMINI_API_KEY=your-key slideflow-next
+
+# Docker Hub image
+docker pull aihara/slideflow-next:v1.0.0
+```
+
+## Dual-Mode Architecture
+
+### Directory Structure
+
+```plaintext
+slideflow/
+├── src/                          # Shared source code (both modes use this)
+│   ├── lib/
+│   │   ├── gemini/              # Gemini API abstraction
+│   │   │   ├── client.ts        # Client-side Gemini (Vite mode)
+│   │   │   ├── prompts.ts       # Shared prompt builders
+│   │   │   └── types.ts         # Shared types
+│   │   ├── pdf.ts               # PDF processing (client-side only)
+│   │   ├── ocr.ts               # OCR pipeline
+│   │   └── tesseract.ts         # Tesseract.js wrapper
+│   ├── context/
+│   │   ├── GeminiContext.tsx    # Gemini API abstraction layer
+│   │   └── RouterContext.tsx    # Router abstraction layer
+│   ├── hooks/
+│   │   └── useShowApiKeyUI.ts   # Mode-aware UI hook
+│   ├── pages/                   # Shared page components
+│   ├── components/
+│   └── stores/
+│
+├── next/                         # Next.js app (Server Actions mode)
+│   ├── app/                     # App Router pages
+│   │   ├── layout.tsx
+│   │   ├── page.tsx             # HomePage wrapper
+│   │   ├── editor/page.tsx      # EditorPage wrapper (ssr: false)
+│   │   ├── settings/page.tsx
+│   │   └── providers.tsx        # Server-side GeminiProvider + RouterProvider
+│   ├── actions/                 # Server Actions
+│   │   ├── editImage.ts
+│   │   ├── generateImage.ts
+│   │   └── refineOcr.ts
+│   ├── lib/
+│   │   └── gemini-server.ts     # Server-side Gemini client
+│   └── Dockerfile               # Docker deployment
+│
+├── package.json                  # Yarn workspaces: [".", "next"]
+└── vite.config.ts               # Vite SPA config
+```
+
+### Context Abstraction Pattern
+
+**GeminiContext** ([src/context/GeminiContext.tsx](src/context/GeminiContext.tsx)):
+
+- Abstracts Gemini API calls for both modes
+- Vite mode: Uses client-side `@google/genai` directly
+- Next.js mode: Calls Server Actions which use server-side client
+
+```typescript
+interface GeminiAPI {
+  editImage: (request: ImageEditRequest) => Promise<string>
+  generateImageFromReference: (request: ImageGenerateRequest) => Promise<string>
+  refineTesseractResults: (request: OcrRefinementRequest) => Promise<OcrTextBlock[]>
+  isInitialized: () => boolean
+  mode: 'client' | 'server'
+}
+```
+
+**RouterContext** ([src/context/RouterContext.tsx](src/context/RouterContext.tsx)):
+
+- Abstracts routing for both modes
+- Vite mode: Uses `react-router-dom`
+- Next.js mode: Uses `next/navigation`
+
+### Mode-Aware UI
+
+Use `useShowApiKeyUI()` to conditionally render API key UI:
+
+- Returns `true` in Vite mode (user manages API key)
+- Returns `false` in Next.js mode (server manages API key)
+
+### PDF.js Compatibility
+
+PDF.js uses Vite-specific `?url` imports. In Next.js:
+
+- Editor page uses `dynamic(() => ..., { ssr: false })` for client-only rendering
+- `serverExternalPackages: ['pdfjs-dist']` in next.config.ts
 
 ## Core Architecture
 
@@ -39,7 +140,7 @@ The entire application state is managed through a single Zustand store at [src/s
 
 - **Project data**: Current project, slides, edit history
 - **UI state**: Selected slide, loading states
-- **App settings**: Gemini API key (stored in localStorage)
+- **App settings**: Gemini API key (stored in localStorage, Vite mode only)
 
 **Key actions:**
 
@@ -108,7 +209,7 @@ project.sfpj
    - Canvas converted to WebP format (90% quality) via `toDataURL('image/webp', 0.90)`
    - Critical: Scale must remain 1.0 to avoid file bloat
 
-2. **Edit** ([src/lib/gemini.ts](src/lib/gemini.ts)):
+2. **Edit** ([src/lib/gemini/](src/lib/gemini/)):
    - Current slide image sent to Gemini API with user prompt
    - Optional reference images for style consistency
    - System prompt applied if configured
@@ -306,8 +407,8 @@ User enters prompt → handleEdit() → editImage() (Gemini API)
 **Components:**
 
 - [src/lib/ocr.ts](src/lib/ocr.ts) - Main OCR interface and pipeline
-- [src/lib/ocr-tesseract.ts](src/lib/ocr-tesseract.ts) - Tesseract.js implementation for bbox detection
-- [src/lib/ocr-gemini.ts](src/lib/ocr-gemini.ts) - Gemini refinement for text accuracy
+- [src/lib/tesseract.ts](src/lib/tesseract.ts) - Tesseract.js implementation for bbox detection
+- [src/lib/gemini/prompts.ts](src/lib/gemini/prompts.ts) - Gemini refinement prompts
 - [src/components/SlideToolbar.tsx](src/components/SlideToolbar.tsx) - Draggable floating toolbar
 - [src/components/OcrOverlay.tsx](src/components/OcrOverlay.tsx) - Interactive text overlay with bboxes
 
@@ -543,28 +644,22 @@ const resultImage = project.images[historyEntry.resultImageId]
 
 ## Security Considerations
 
-**Personal Use Tool:**
+**Vite SPA Mode (Client-Side):**
 
-- Designed as a personal productivity tool for users with their own Google AI API keys
-- No backend server required - runs entirely in the browser
 - API key stored in localStorage (user's responsibility to protect)
 - All processing happens in browser
 - Each user must obtain and configure their own API key
 
-**For SaaS Deployment:**
+**Next.js Server Mode:**
 
-If converting to a multi-user SaaS service, implement a backend API that:
-
-- Stores API keys server-side (never exposed to client)
-- Proxies Gemini API calls through backend
-- Implements user authentication and authorization
-- Adds rate limiting and usage monitoring per user
-- Provides billing/subscription management
-- Manages project storage (currently client-side only)
+- API key stored in environment variable (`GEMINI_API_KEY`)
+- API calls proxied through Server Actions
+- Client never sees API key
+- Suitable for shared deployments with authentication
 
 ## Known Limitations
 
 - No undo/redo functionality (use edit history to revert)
 - Large PDFs (>50 pages) may cause memory issues
 - Reference images are lost if not used in any edit
-- API key visible in localStorage (browser dev tools)
+- Vite mode: API key visible in localStorage (browser dev tools)

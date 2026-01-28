@@ -1,6 +1,6 @@
 import type { OcrResult } from '../types/project'
+import type { GeminiAPI } from '../context/GeminiContext'
 import { extractTextWithTesseract } from './tesseract'
-import { refineTesseractResults } from './gemini'
 
 export interface OcrOptions {
   onProgress?: (status: string) => void
@@ -8,7 +8,7 @@ export interface OcrOptions {
 
 export async function extractText(
   dataUrl: string,
-  apiKey: string,
+  gemini: GeminiAPI,
   options?: OcrOptions
 ): Promise<OcrResult> {
   const { onProgress } = options || {}
@@ -21,18 +21,17 @@ export async function extractText(
 
   // Step 2: Refine with Gemini (optional - will use Tesseract results if this fails)
   let refinedBlocks = tesseractBlocks
-  if (apiKey) {
-    try {
-      console.log('[OCR] Starting Gemini refinement...')
-      onProgress?.('GeminiでOCR精度向上中...')
-      refinedBlocks = await refineTesseractResults(tesseractBlocks, dataUrl, apiKey)
-      console.log('[OCR] Gemini refinement completed')
-    } catch (error) {
-      console.warn('[OCR] Gemini refinement failed, using Tesseract results only:', error)
-      // Continue with Tesseract results
-    }
-  } else {
-    console.warn('[OCR] No API key provided, skipping Gemini refinement')
+  try {
+    console.log('[OCR] Starting Gemini refinement...')
+    onProgress?.('GeminiでOCR精度向上中...')
+    refinedBlocks = await gemini.refineTesseractResults({
+      tesseractBlocks,
+      imageDataUrl: dataUrl
+    })
+    console.log('[OCR] Gemini refinement completed')
+  } catch (error) {
+    console.warn('[OCR] Gemini refinement failed, using Tesseract results only:', error)
+    // Continue with Tesseract results
   }
 
   // Step 3: Generate full text from text blocks

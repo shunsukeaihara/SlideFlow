@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Eye, EyeOff, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,10 +6,15 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useProjectStore } from '@/stores/projectStore'
+import { useAppRouter } from '@/hooks/useAppRouter'
+import { useShowApiKeyUI } from '@/hooks/useShowApiKeyUI'
+import { useGemini } from '@/context/GeminiContext'
 import { initializeGemini } from '@/lib/gemini'
 
 export function SettingsPage() {
-  const navigate = useNavigate()
+  const router = useAppRouter()
+  const showApiKeyUI = useShowApiKeyUI()
+  const gemini = useGemini()
   const { project, appSettings, setApiKey, setBasePrompt } = useProjectStore()
 
   const [apiKeyInput, setApiKeyInput] = useState(appSettings.apiKey)
@@ -19,21 +23,23 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false)
 
   const handleBack = useCallback(() => {
-    navigate(-1)
-  }, [navigate])
+    router.back()
+  }, [router])
 
   const handleSave = useCallback(async () => {
-    // APIキーをlocalStorageに保存
-    setApiKey(apiKeyInput)
-    if (apiKeyInput) {
-      initializeGemini(apiKeyInput)
+    // APIキーをlocalStorageに保存 (only in client mode)
+    if (showApiKeyUI) {
+      setApiKey(apiKeyInput)
+      if (apiKeyInput) {
+        initializeGemini(apiKeyInput)
+      }
     }
     if (project) {
       setBasePrompt(basePromptInput)
     }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
-  }, [apiKeyInput, basePromptInput, project, setApiKey, setBasePrompt])
+  }, [apiKeyInput, basePromptInput, project, setApiKey, setBasePrompt, showApiKeyUI])
 
   return (
     <div className="flex h-full flex-col">
@@ -52,54 +58,57 @@ export function SettingsPage() {
 
       <main className="flex-1 overflow-auto p-6">
         <div className="mx-auto max-w-2xl space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>API設定</CardTitle>
-              <CardDescription>
-                Gemini APIを使用するためのAPIキーを設定します。
-                <a
-                  href="https://aistudio.google.com/apikey"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="ml-1 text-blue-600 hover:underline"
-                >
-                  APIキーを取得
-                </a>
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="apiKey">Google AI API Key</Label>
-                <div className="relative">
-                  <Input
-                    id="apiKey"
-                    type={showApiKey ? 'text' : 'password'}
-                    value={apiKeyInput}
-                    onChange={(e) => setApiKeyInput(e.target.value)}
-                    placeholder="AIza..."
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => setShowApiKey(!showApiKey)}
+          {/* API設定 - only shown in client mode */}
+          {showApiKeyUI && (
+            <Card>
+              <CardHeader>
+                <CardTitle>API設定</CardTitle>
+                <CardDescription>
+                  Gemini APIを使用するためのAPIキーを設定します。
+                  <a
+                    href="https://aistudio.google.com/apikey"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ml-1 text-blue-600 hover:underline"
                   >
-                    {showApiKey ? (
-                      <EyeOff className="h-4 w-4 text-gray-500" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-500" />
-                    )}
-                  </Button>
+                    APIキーを取得
+                  </a>
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="apiKey">Google AI API Key</Label>
+                  <div className="relative">
+                    <Input
+                      id="apiKey"
+                      type={showApiKey ? 'text' : 'password'}
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                      placeholder="AIza..."
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                    >
+                      {showApiKey ? (
+                        <EyeOff className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-500" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    APIキーはブラウザのlocalStorageに保存され、Gemini
+                    APIへのリクエストにのみ使用されます。
+                  </p>
                 </div>
-                <p className="text-xs text-gray-500">
-                  APIキーはブラウザのlocalStorageに保存され、Gemini
-                  APIへのリクエストにのみ使用されます。
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {project && (
             <Card>
@@ -140,6 +149,10 @@ export function SettingsPage() {
                 <div className="flex justify-between">
                   <dt className="text-gray-500">使用モデル</dt>
                   <dd className="font-medium">gemini-3-pro-image-preview (Nano Banana Pro)</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">実行モード</dt>
+                  <dd className="font-medium">{gemini.mode === 'server' ? 'サーバーサイド' : 'クライアントサイド'}</dd>
                 </div>
               </dl>
             </CardContent>
