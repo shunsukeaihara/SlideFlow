@@ -139,7 +139,7 @@ export async function refineTesseractResults(
 
   try {
     const response = await client.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.5-flash',
       contents,
       config: {
         responseMimeType: 'application/json'
@@ -154,6 +154,8 @@ export async function refineTesseractResults(
     return processOcrResponse(text, tesseractBlocks.length)
   } catch (error) {
     console.error('Gemini refinement error:', error)
-    throw new Error(`Gemini refinement failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    throw new Error(
+      `Gemini refinement failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    )
   }
 }

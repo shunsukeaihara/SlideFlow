@@ -87,7 +87,9 @@ export async function generateImageFromReference(request: ImageGenerateRequest):
   return extractImageFromResponse(response)
 }
 
-export async function refineTesseractResults(request: OcrRefinementRequest): Promise<OcrTextBlock[]> {
+export async function refineTesseractResults(
+  request: OcrRefinementRequest
+): Promise<OcrTextBlock[]> {
   const client = getClient()
 
   const prompt = buildOcrRefinementPrompt(request.tesseractBlocks)
@@ -95,7 +97,7 @@ export async function refineTesseractResults(request: OcrRefinementRequest): Pro
 
   try {
     const response = await client.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.5-flash',
       contents,
       config: {
         responseMimeType: 'application/json'
@@ -110,6 +112,8 @@ export async function refineTesseractResults(request: OcrRefinementRequest): Pro
     return processOcrResponse(text, request.tesseractBlocks.length)
   } catch (error) {
     console.error('Gemini refinement error:', error)
-    throw new Error(`Gemini refinement failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    throw new Error(
+      `Gemini refinement failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    )
   }
 }
