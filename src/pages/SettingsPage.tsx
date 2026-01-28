@@ -144,7 +144,7 @@ export function SettingsPage() {
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-gray-500">バージョン</dt>
-                  <dd className="font-medium">1.0.0</dd>
+                  <dd className="font-medium">1.0.4</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500">使用モデル</dt>
@@ -152,7 +152,9 @@ export function SettingsPage() {
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500">実行モード</dt>
-                  <dd className="font-medium">{gemini.mode === 'server' ? 'サーバーサイド' : 'クライアントサイド'}</dd>
+                  <dd className="font-medium">
+                    {gemini.mode === 'server' ? 'サーバーサイド' : 'クライアントサイド'}
+                  </dd>
                 </div>
               </dl>
             </CardContent>
