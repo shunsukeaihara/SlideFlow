@@ -17,3 +17,5 @@ next/.env.local
 # Environment
 .env
 tsconfig.tsbuildinfo
+
+Makefile

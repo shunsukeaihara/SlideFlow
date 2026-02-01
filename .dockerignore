@@ -33,3 +33,6 @@ docs/
 *.test.*
 *.spec.*
 __tests__
+
+
+Makefile

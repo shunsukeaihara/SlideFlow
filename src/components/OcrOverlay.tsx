@@ -66,8 +66,15 @@ export function OcrOverlay({ ocrResult, imageElement }: OcrOverlayProps) {
   }, [imageElement])
 
   useEffect(() => {
-    // Close context menu when clicking anywhere
-    const handleDocumentClick = () => setContextMenu(null)
+    // Close context menu when clicking anywhere outside the menu
+    const handleDocumentClick = (e: MouseEvent) => {
+      // Don't close if clicking on a text block (let handleClick handle it)
+      const target = e.target as HTMLElement
+      if (target.closest('[data-ocr-block]') || target.closest('[data-context-menu]')) {
+        return
+      }
+      setContextMenu(null)
+    }
     document.addEventListener('click', handleDocumentClick)
     return () => document.removeEventListener('click', handleDocumentClick)
   }, [])
@@ -98,12 +105,35 @@ export function OcrOverlay({ ocrResult, imageElement }: OcrOverlayProps) {
 
   const handleCopyText = async (blockIndex: number) => {
     const text = ocrResult.textBlocks[blockIndex].text
-    try {
-      await navigator.clipboard.writeText(text)
-      setContextMenu(null)
-    } catch (err) {
-      console.error('Failed to copy text:', err)
+
+    // Fallback using textarea and execCommand
+    const copyWithFallback = () => {
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      textArea.style.top = '-999999px'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      const success = document.execCommand('copy')
+      document.body.removeChild(textArea)
+      return success
     }
+
+    try {
+      // Try modern clipboard API first (requires HTTPS or localhost)
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        // Fallback for non-secure contexts (HTTP)
+        copyWithFallback()
+      }
+    } catch {
+      // If clipboard API fails (e.g., permission denied), use fallback
+      copyWithFallback()
+    }
+    setContextMenu(null)
   }
 
   return (
@@ -125,6 +155,7 @@ export function OcrOverlay({ ocrResult, imageElement }: OcrOverlayProps) {
         return (
           <div
             key={blockIndex}
+            data-ocr-block
             className="absolute cursor-pointer transition-colors hover:bg-blue-500/20"
             style={{
               left: `${scaledBox.left}px`,
@@ -162,6 +193,7 @@ export function OcrOverlay({ ocrResult, imageElement }: OcrOverlayProps) {
       {/* Context menu */}
       {contextMenu && (
         <div
+          data-context-menu
           className="fixed z-50 rounded-lg border border-gray-300 bg-white shadow-lg"
           style={{
             left: `${contextMenu.x}px`,
